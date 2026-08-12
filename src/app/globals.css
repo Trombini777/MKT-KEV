@@ -1,0 +1,147 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/*
+ * Tema Kev Marketing — cores extraídas de "Identidade visual Kev/Apresentação
+ * Institucional" (verde-limão #CFF74A) sobre uma base neutra estilo macOS,
+ * aprovada em revisão visual (ver docs/PLAN.md, M0).
+ */
+:root {
+  --background: #f5f5f7;
+  --foreground: #1d1d1f;
+  --card: #ffffff;
+  --card-foreground: #1d1d1f;
+  --popover: #ffffff;
+  --popover-foreground: #1d1d1f;
+  --primary: #cff74a;
+  --primary-foreground: #14210a;
+  --secondary: #ebebef;
+  --secondary-foreground: #1d1d1f;
+  --muted: #ebebef;
+  --muted-foreground: #6e6e73;
+  --accent: #eaf9c4;
+  --accent-foreground: #14210a;
+  --destructive: #d70015;
+  --success: #248a3d;
+  --success-foreground: #f5f5f7;
+  --warning: #b9660a;
+  --warning-foreground: #f5f5f7;
+  --border: #d2d2d7;
+  --input: #d2d2d7;
+  --ring: #cff74a;
+  --chart-1: #cff74a;
+  --chart-2: #248a3d;
+  --chart-3: #b9660a;
+  --chart-4: #6e6e73;
+  --chart-5: #1d1d1f;
+  --radius: 0.75rem;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #1d1d1f;
+  --sidebar-primary: #cff74a;
+  --sidebar-primary-foreground: #14210a;
+  --sidebar-accent: #ebebef;
+  --sidebar-accent-foreground: #1d1d1f;
+  --sidebar-border: #d2d2d7;
+  --sidebar-ring: #cff74a;
+}
+
+.dark {
+  --background: #000000;
+  --foreground: #f5f5f7;
+  --card: #1c1c1e;
+  --card-foreground: #f5f5f7;
+  --popover: #1c1c1e;
+  --popover-foreground: #f5f5f7;
+  --primary: #cff74a;
+  --primary-foreground: #14210a;
+  --secondary: #2c2c2e;
+  --secondary-foreground: #f5f5f7;
+  --muted: #1c1c1e;
+  --muted-foreground: #98989d;
+  --accent: #263310;
+  --accent-foreground: #eaf9c4;
+  --destructive: #ff453a;
+  --success: #32d74b;
+  --success-foreground: #06280f;
+  --warning: #ff9f0a;
+  --warning-foreground: #331f00;
+  --border: #38383a;
+  --input: #38383a;
+  --ring: #cff74a;
+  --chart-1: #cff74a;
+  --chart-2: #32d74b;
+  --chart-3: #ff9f0a;
+  --chart-4: #98989d;
+  --chart-5: #f5f5f7;
+  --sidebar: #1c1c1e;
+  --sidebar-foreground: #f5f5f7;
+  --sidebar-primary: #cff74a;
+  --sidebar-primary-foreground: #14210a;
+  --sidebar-accent: #2c2c2e;
+  --sidebar-accent-foreground: #f5f5f7;
+  --sidebar-border: #38383a;
+  --sidebar-ring: #cff74a;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
