@@ -1,27 +1,20 @@
 import type { SVGProps } from "react";
 
 /**
- * Aproximação do ícone da marca Kev (losango/"olho") até termos o vetor real
- * exportado de `Identidade visual Kev/Logo/KEV_LOGOS_FINAIS_V02.ai` para SVG.
+ * Ícone oficial da marca Kev (losango/"olho"), vetorizado a partir de
+ * `Identidade visual Kev/Logo/KEV_LOGOS_FINAIS_V02.ai` (página 3).
  */
 export function KevMark(props: SVGProps<SVGSVGElement>) {
   return (
-    <svg viewBox="0 0 32 32" fill="none" aria-hidden="true" {...props}>
-      <path
-        d="M13 8 L5 16 L13 24"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M19 8 L27 16 L19 24"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle cx="16" cy="16" r="2.4" fill="currentColor" />
+    <svg
+      viewBox="418.71 417.23 367.63 245.90"
+      fill="currentColor"
+      aria-hidden="true"
+      {...props}
+    >
+      <path d="M 554.585938 653.132812 L 451.601562 583.9375 C 449.59375 582.457031 428.707031 566.476562 429.257812 538.816406 C 429.773438 512.648438 449.042969 497.769531 451.375 496.035156 L 554.019531 427.234375 L 579.644531 465.328125 L 481.234375 531.292969 C 478.359375 533.21875 476.636719 536.449219 476.636719 539.910156 C 476.636719 543.371094 478.359375 546.601562 481.234375 548.53125 L 579.84375 614.625 Z M 554.585938 653.132812" />
+      <path d="M 650.460938 653.132812 L 753.449219 583.9375 C 755.453125 582.457031 776.339844 566.476562 775.789062 538.816406 C 775.273438 512.648438 756.003906 497.769531 753.671875 496.035156 L 651.027344 427.234375 L 625.402344 465.328125 L 723.8125 531.292969 C 726.6875 533.21875 728.410156 536.449219 728.410156 539.910156 C 728.410156 543.371094 726.6875 546.601562 723.8125 548.53125 L 625.203125 614.625 Z M 650.460938 653.132812" />
+      <path d="M 565.410156 540.183594 C 565.410156 560.679688 582.027344 577.296875 602.523438 577.296875 C 623.019531 577.296875 639.636719 560.679688 639.636719 540.183594 C 639.636719 519.683594 623.019531 503.070312 602.523438 503.070312 C 582.027344 503.070312 565.410156 519.683594 565.410156 540.183594" />
     </svg>
   );
 }

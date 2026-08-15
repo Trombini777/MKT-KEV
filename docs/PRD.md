@@ -100,12 +100,13 @@ Origem da demanda → Backlog priorizado → Planejamento semanal (por capacidad
   - **Formulário público** (sem login) — substitui o Pipefy, pra quem não é usuário do sistema.
   - **Botão "Criar solicitação"** dentro do sistema — pra quando o pedido chegou por outro canal
     (reunião, WhatsApp, ligação) e alguém do marketing registra em nome de quem pediu.
-  - Campos: nome do solicitante (opcional), e-mail (obrigatório), Departamento/Área (obrigatório),
-    título (obrigatório), descrição (obrigatório), **prioridade sugerida** (obrigatório — Alta /
-    Regular / Baixa, com aviso explícito de que não acelera a fila sozinha), justificativa
-    (obrigatório só se Alta), anexos (opcional), observações (opcional). A prioridade sugerida
-    fica registrada, mas a **Prioridade final** (os 4 níveis do sistema) só é confirmada na
-    Triagem.
+  - Campos: nome do solicitante (opcional), e-mail (obrigatório), Departamento/Área (obrigatório,
+    lista em ordem alfabética), título (obrigatório), descrição (obrigatório), **prioridade
+    sugerida** (obrigatório: Alta / Regular / Baixa, com aviso explícito de que não acelera a
+    fila sozinha), justificativa da prioridade (obrigatório só se Alta), **tem prazo limite?**
+    (Sim/Não; se Sim, exige data do prazo e justificativa do prazo), anexos (opcional),
+    observações (opcional). A prioridade sugerida fica registrada, mas a **Prioridade final**
+    (os 4 níveis do sistema) só é confirmada na Triagem.
 - **Prazo vs. Previsão de conclusão** — dois campos distintos:
   - **Prazo**: o compromisso. Definido manualmente, fixo até alguém editar explicitamente.
   - **Previsão de conclusão**: campo *calculado*, não editável diretamente. Recalcula

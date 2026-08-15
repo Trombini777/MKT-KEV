@@ -7,6 +7,14 @@ Baseado em [CLAUDE.md](../CLAUDE.md) e [PRD.md](PRD.md).
 UI-first com dados mock, depois backend real (Supabase). Cada milestone entrega algo visível e
 testável antes de passar para o próximo. Convenção de branch: `feat/NN-nome-do-milestone`.
 
+**Nota (pré-visualização adiantada):** a pedido do usuário, as telas de UI de M1 e também as
+telas de M3 a M8 foram construídas de uma vez, fora de ordem, todas com dados mock e sem
+backend real. Isso cobre a camada visual/interativa de cada milestone, mas **não** as entregas
+de schema/CRUD/RLS do Supabase listadas em cada um (M2, e as partes de backend de M3-M8) — essas
+continuam pendentes e devem ser feitas milestone a milestone, como planejado. Os checkboxes de
+UI de cada milestone abaixo foram marcados quando a tela correspondente já existe; os de
+schema/backend continuam em aberto.
+
 ---
 
 ## M0 — Setup do Projeto e Fundação
@@ -36,24 +44,26 @@ Vercel e Supabase conectado (mesmo que ainda sem schema de domínio).
 **Objetivo:** Validar a experiência central do sistema — Kanban e detalhe de tarefa — com dados
 mock, antes de desenhar o schema real.
 **Entregas:**
-- [ ] Tela de configuração de Fluxo de Trabalho como **grafo** (cada fase define explicitamente
+- [x] Tela de configuração de Fluxo de Trabalho como **grafo** (cada fase define explicitamente
       pra quais outras fases pode ir — não só "próxima da lista"), SLA por fase, fase(s)
       final(is), atributo **Modo de execução** (Individual | Coletiva) por fase — com dados mock
-- [ ] Fluxo padrão pré-carregado (mock) com as 8 fases reais: Solicitações → Triagem ⇄
+- [x] Fluxo padrão pré-carregado (mock) com as 8 fases reais: Solicitações → Triagem ⇄
       Aguardando Informações → Backlog → Em Execução → Aprovação → Concluído, com Refação como
       desvio de Aprovação de volta pra Em Execução
-- [ ] Tela de Tipos de Tarefa por canal/formato (Post Social, E-mail, Peça para Corretor, Banner,
+- [x] Tela de Tipos de Tarefa por canal/formato (Post Social, E-mail, Peça para Corretor, Banner,
       Vídeo, Comunicado Interno, Material de Campanha) com dados mock
-- [ ] Formulário de Solicitação (mock): nome do solicitante, e-mail, Departamento/Área, título,
-      descrição, prioridade sugerida, justificativa (condicional se Alta), anexos, observações
-- [ ] View Kanban de tarefas (colunas = fases do fluxo) com dados mock
-- [ ] Modal/painel de detalhe de tarefa: título, descrição, tipo, origem, **Executor por Fase**
+- [x] Formulário de Solicitação (mock): nome do solicitante, e-mail, Departamento/Área, título,
+      descrição, prioridade sugerida, justificativa (condicional se Alta), anexos, observações,
+      além de "tem prazo limite?" (data + justificativa do prazo)
+- [x] View Kanban de tarefas (colunas = fases do fluxo) com dados mock
+- [x] Modal/painel de detalhe de tarefa: título, descrição, tipo, origem, **Executor por Fase**
       (não mais um único responsável), participantes, prioridade, datas, **estimativa de horas
       por fase**, checklist, anexos (placeholder), comentários com @menção, histórico de
       mudanças — tudo com dados mock
-- [ ] Transição de etapa (drag-and-drop no Kanban + botão "Mover etapa"), respeitando só os
+- [x] Transição de etapa (drag-and-drop no Kanban + botão "Mover etapa"), respeitando só os
       destinos definidos no grafo da fase atual
 **Commit final:** `feat: telas de fluxo de trabalho (grafo), tipos de tarefa e kanban (mock)`
+**Status:** UI-first completo (dados mock). Pendente: revisão do usuário.
 
 ---
 
@@ -99,11 +109,10 @@ mock, antes de desenhar o schema real.
 **Entregas:**
 - [ ] Schema + CRUD de Projeto (nome, sigla, descrição, responsável, datas, progresso automático)
 - [ ] Associação de tarefas a projeto (N:1)
-- [ ] Tela de detalhe do projeto: lista de tarefas, % de progresso, tarefas atrasadas
+- [x] Tela de lista + detalhe do projeto: progresso, tarefas atrasadas, lista de tarefas (mock)
 - [ ] Templates de campanha reutilizáveis (estrutura de tarefas pré-definida para campanhas
       sazonais recorrentes)
-- [ ] **Notas de Encerramento**: campo de texto livre preenchido ao concluir o projeto/campanha,
-      exibido na tela de detalhe (retrospectiva leve, alimenta ajuste dos templates acima)
+- [x] **Notas de Encerramento**: campo de texto na tela de detalhe (mock, não persiste)
 **Commit final:** `feat: projetos, campanhas e templates`
 
 ---
@@ -114,10 +123,10 @@ mock, antes de desenhar o schema real.
 **Entregas:**
 - [ ] Schema + CRUD de colaborador (nome, e-mail, cargo, skills, capacidade em horas/semana,
       status Ativo/Licença/Inativo)
-- [ ] Squads (agrupamento leve acima do colaborador — Squad Conteúdo, Squad Mídia Paga, Squad
-      Design — campo de filtro/agrupamento, sem hierarquia extra)
+- [x] Squads (agrupamento leve acima do colaborador — mock, tela de Pessoas agrupada por squad)
+- [x] Tela de configuração do Executor Padrão por Tipo de Tarefa × Fase (mock, somente leitura)
 - [ ] Executores de fase e participantes de tarefa passam a referenciar colaboradores reais
-      (não mock); tela de configuração do Executor Padrão por Tipo de Tarefa × Fase (M2)
+      (não mock)
 - [ ] Regra de reatribuição ao marcar colaborador como Inativo (execuções de fase ativas dele
       precisam de novo executor)
 **Commit final:** `feat: cadastro de colaboradores, squads e capacidade`
@@ -129,33 +138,23 @@ mock, antes de desenhar o schema real.
 **Objetivo:** Entregar o ciclo central do sistema: backlog priorizado → planejamento semanal por
 capacidade → semana equilibrada.
 **Entregas:**
-- [ ] Tela de **Triagem**: fila de Solicitações pendentes — gestor confirma Tipo de Tarefa,
-      ajusta a Prioridade sugerida pra Prioridade final, define data de início e decide (com
-      apoio do Motor de Previsão abaixo) se precisa realocar outras demandas antes de liberar
-      pro Backlog. Nunca rejeita — só prepara
-- [ ] Tela de Backlog: lista de tarefas pendentes, ordenável/filtrável por prioridade, origem,
-      tipo, executor da fase atual
-- [ ] Tela de Planejamento Semanal: aloca tarefas do backlog nos dias da semana por colaborador,
-      respeitando capacidade cadastrada (M4)
-- [ ] Sinalização visual de sobrecarga **por dia** (verde/amarelo/vermelho por thresholds de
-      horas) — não bloqueia alocar além da capacidade, só avisa (mesma regra da Workload do M6)
-- [ ] Ajuste manual (mover tarefa entre pessoas/dias) antes de "fechar" o planejamento da semana
-- [ ] Registro do planejamento fechado (para comparar planejado vs. entregue no M7)
-- [ ] **Motor de Previsão por Fila de Capacidade**: simulação diária por colaborador, a partir
-      das **execuções de fase** dele (não da tarefa inteira — `task_phase_executions` do M2),
-      ordenadas por prioridade + folga de prazo, que calcula `previsão_conclusão` de cada tarefa;
-      roda em background a cada mudança relevante na fila (nova execução, reprioridade,
-      reatribuição, mudança de capacidade); nunca reagenda nada sozinho, só recalcula o número
-- [ ] Cálculo de **folga de prazo** (`prazo − previsão_conclusão`) e flag "em risco" quando
-      negativa
-- [ ] **Motor de Sugestão de Replanejamento**: gera lista de sugestões individuais (mover tarefa
-      X, aproveitar folga de tarefa Y) quando alguém fica sobrecarregado ou uma tarefa fica "em
-      risco" — cada sugestão aplicada com um clique isolado; nenhuma aplicação em lote/automática
-- [ ] **Painel de Trabalho** — nova **tela inicial do sistema** (rota raiz pós-login, substitui
-      qualquer dashboard como home): "Resumo" (mini Workload pessoal + contadores de tarefas
-      comigo agora / entrando em breve / pendentes de triagem), "Para executar agora" (minhas
-      execuções de fase, por prioridade + prazo, clicável pra abrir e iniciar), "Entrando em
-      breve" e "Pendente de Triagem" (visível a todos, sem diferenciação por perfil)
+- [x] Tela de **Triagem**: fila de Solicitações pendentes, ajusta Tipo/Prioridade final/data de
+      início e libera para o Backlog (mock, sem Motor de Previsão real ainda)
+- [x] Tela de Backlog: lista/ordena/filtra por prioridade, origem, tipo (mock)
+- [x] Tela de Planejamento Semanal: aloca tarefa do backlog num dia/colaborador, grade da semana
+      (mock, alocação local não persistida)
+- [x] Sinalização visual de sobrecarga **por dia** (verde/amarelo/vermelho) — não bloqueia, só avisa
+- [ ] Ajuste manual completo (mover tarefa entre pessoas/dias já alocados) — hoje só aloca, não
+      realoca
+- [ ] Registro do planejamento fechado (para comparar planejado vs. entregue no M7) — botão
+      "Fechar" existe mas não persiste
+- [ ] **Motor de Previsão por Fila de Capacidade**: simulação diária real — hoje `previsão de
+      conclusão` é dado mock por tarefa, não calculado
+- [x] Cálculo de **folga de prazo** (`prazo − previsão_conclusão`) e flag "em risco" — lógica de
+      comparação real, alimentada por datas mock
+- [ ] **Motor de Sugestão de Replanejamento** — não implementado
+- [x] **Painel de Trabalho** — tela inicial do sistema em `/painel`: Resumo, Para executar agora,
+      Entrando em breve, Pendente de Triagem (mock)
 **Commit final:** `feat: backlog, priorização, previsão de fila, sugestão e painel de trabalho`
 
 ---
@@ -164,15 +163,13 @@ capacidade → semana equilibrada.
 **Branch:** `feat/06-visualizacoes`
 **Objetivo:** Completar as views de tarefas além do Kanban.
 **Entregas:**
-- [ ] View Lista com filtros combináveis (executor da fase atual, tipo, origem,
-      Departamento/Área solicitante, prioridade, projeto, squad, tags, situação, prazo) e
-      filtros salvos
-- [ ] View Calendário editorial
-- [ ] View Workload — grade **pessoa × dia** (não semana agregada), com seletor de intervalo
-      (próximos 7 / 15 / 30 dias, toggle Dia/Semana/Mês), célula colorida por carga do dia
-      (verde/amarelo/vermelho), reaproveitando capacidade do M4/M5. **Nunca bloqueia**
-      over-allocation, só sinaliza. Prioridade máxima entre as views novas
-- [ ] View Gantt (timeline por tarefa/projeto com setas de dependência bloqueante/bloqueada por)
+- [x] View Lista (mock) — filtros de tipo, origem, prioridade e situação implementados; faltam
+      Departamento/Área, projeto, squad, tags, prazo e filtros salvos
+- [x] View Calendário editorial (mock, mês atual)
+- [x] View Workload — grade **pessoa × dia**, seletor 7/15/30 dias, célula colorida por carga
+      (mock). **Nunca bloqueia** over-allocation, só sinaliza
+- [x] View Gantt (mock) — barras por data de tarefa/projeto; setas de dependência
+      bloqueante/bloqueada por ainda não implementadas (falta o campo de dependência no modelo)
 **Commit final:** `feat: views de lista, calendário, workload e gantt`
 
 ---
@@ -182,14 +179,13 @@ capacidade → semana equilibrada.
 **Objetivo:** Camada analítica para acompanhar produtividade e fechar o ciclo do planejamento
 semanal.
 **Entregas:**
-- [ ] Dashboard "Gestão de Produtividade" (visão geral do time inteiro: ativas, a vencer,
-      atrasadas, **em risco** — Previsão > Prazo, do motor do M5 —, por urgência) — relatório à
-      parte, não é mais a tela inicial (isso agora é o Painel de Trabalho do M5)
-- [ ] Dashboard "Atividades por Pessoa"
-- [ ] Dashboard "Atividades por Etapa" (identificar gargalos)
-- [ ] Dashboard "Atividades por Squad"
-- [ ] Dashboard "Atividades por Departamento/Área solicitante" (recorte pelas Solicitações do M2)
-- [ ] Comparativo planejado (M5) vs. entregue por semana
+- [x] Dashboard "Gestão de Produtividade" (ativas, a vencer, atrasadas, em risco) — mock
+- [x] Dashboard "Atividades por Pessoa" (mock)
+- [x] Dashboard "Atividades por Etapa" (mock)
+- [x] Dashboard "Atividades por Squad" (mock)
+- [x] Dashboard "Atividades por Departamento/Área solicitante" (mock)
+- [x] Comparativo planejado vs. entregue por semana — números ilustrativos fixos, ainda não
+      vêm do registro real de planejamento fechado (M5)
 **Commit final:** `feat: dashboards de performance e produtividade`
 
 ---
@@ -199,7 +195,7 @@ semanal.
 **Objetivo:** Formalizar os 3 níveis de acesso para os ~10 usuários reais do time.
 **Entregas:**
 - [ ] Perfis Admin / Editor / Viewer aplicados via RLS e nas telas (esconder ações não permitidas)
-- [ ] Tela de gestão de usuários (Admin cria/edita/desativa acesso)
+- [x] Tela de gestão de usuários (mock: lista + troca de perfil local, não persiste)
 - [ ] Ajuste fino de RLS por perfil nas tabelas de domínio (tarefas, projetos, colaboradores)
 **Commit final:** `feat: perfis de acesso admin/editor/viewer`
 
