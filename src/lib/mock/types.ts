@@ -40,7 +40,7 @@ export type Transicao = {
   label?: string;
 };
 
-export type CategoriaEtapa = "A fazer" | "Em andamento" | "Concluído";
+export type CategoriaEtapa = "Backlog" | "Em Execução" | "Em Aprovação" | "Concluído";
 
 /** Etapa cadastrada globalmente (aba Etapas), reutilizável por qualquer Tipo de Tarefa. */
 export type EtapaTarefa = {
@@ -165,6 +165,8 @@ export type PlanejamentoTarefa = {
   status: StatusPlanejamento;
   /** Dias entre previsaoConclusao e prazo (prazo − previsão). Negativo = atraso. Undefined = sem prazo. */
   folgaDias?: number;
+  /** `ordem` da etapa em execução agora — etapas com ordem menor já foram concluídas. */
+  etapaAtualOrdem: number;
 };
 
 export type Tarefa = {
@@ -178,8 +180,10 @@ export type Tarefa = {
   solicitanteNome?: string;
   /** E-mail de quem pediu a tarefa — preenchido quando origem é "Solicitação". */
   solicitanteEmail?: string;
-  /** Nomes dos arquivos anexados na solicitação — preenchido quando origem é "Solicitação". */
+  /** Nomes dos arquivos anexados — preenchido na solicitação e/ou durante a execução. */
   anexos?: string[];
+  /** Links úteis pra execução da atividade (referência, arquivo em nuvem etc.), adicionados livremente. */
+  links?: string[];
   /** Por que a solicitação é Alta prioridade — preenchido só quando prioridadeSugerida é "Alta". */
   justificativaPrioridade?: string;
   /** Por que o prazo informado é necessário — preenchido só quando o solicitante indicou prazo limite. */

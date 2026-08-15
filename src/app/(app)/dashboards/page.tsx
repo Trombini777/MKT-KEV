@@ -1,3 +1,5 @@
+"use client";
+
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/page-header";
@@ -11,13 +13,18 @@ import {
   COMPARATIVO_SEMANAL,
   SQUADS,
 } from "@/lib/mock";
+import { useTasks } from "@/lib/task-store";
+import { useColaboradores } from "@/lib/colaborador-store";
 
 export default function DashboardsPage() {
-  const resumo = resumoProdutividade();
-  const porPessoa = atividadesPorPessoa();
-  const porEtapa = atividadesPorEtapa();
-  const porSquad = atividadesPorSquad();
-  const porDepartamento = atividadesPorDepartamento();
+  const tarefas = useTasks();
+  const colaboradores = useColaboradores();
+
+  const resumo = resumoProdutividade(tarefas);
+  const porPessoa = atividadesPorPessoa(tarefas, colaboradores);
+  const porEtapa = atividadesPorEtapa(tarefas);
+  const porSquad = atividadesPorSquad(tarefas, colaboradores);
+  const porDepartamento = atividadesPorDepartamento(tarefas);
 
   const maxPessoa = Math.max(1, ...porPessoa.map((p) => p.ativas));
   const maxEtapa = Math.max(1, ...porEtapa.map((e) => e.total));

@@ -16,11 +16,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { DEPARTAMENTOS } from "@/lib/departamentos";
+import { useDepartamentos } from "@/lib/departamentos-store";
 import { Check, Inbox } from "lucide-react";
-import { addTask } from "@/lib/task-store";
-import type { PrioridadeFinal, PrioridadeSugerida } from "@/lib/mock";
-import { isoHoje } from "@/lib/hoje";
+import { createClient } from "@/lib/supabase/client";
+import type { PrioridadeSugerida } from "@/lib/mock";
 
 function CabecalhoSolicitacao({ mostrarDescricao }: { mostrarDescricao: boolean }) {
   return (
@@ -48,12 +47,6 @@ const PRIORIDADES = [
 const PRIORIDADE_SUGERIDA: Record<string, PrioridadeSugerida> = {
   alta: "Alta",
   regular: "Regular",
-  baixa: "Baixa",
-};
-
-const PRIORIDADE_FINAL: Record<string, PrioridadeFinal> = {
-  alta: "Alta",
-  regular: "Normal",
   baixa: "Baixa",
 };
 
@@ -102,6 +95,7 @@ function CampoErro({ mensagem }: { mensagem?: string }) {
 }
 
 export function SolicitacaoForm() {
+  const DEPARTAMENTOS = useDepartamentos();
   const [prioridade, setPrioridade] = useState<string>("regular");
   const [departamento, setDepartamento] = useState<string>("");
   const [temPrazo, setTemPrazo] = useState<string>("nao");
@@ -109,7 +103,7 @@ export function SolicitacaoForm() {
   const [submitted, setSubmitted] = useState(false);
   const [erros, setErros] = useState<ErrosSolicitacao>({});
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const dados = new FormData(event.currentTarget);
     const nome = String(dados.get("nome") ?? "").trim();
@@ -152,44 +146,29 @@ export function SolicitacaoForm() {
     setErros({});
 
     setIsSubmitting(true);
-    window.setTimeout(() => {
-      addTask({
-        id: `tarefa-${Date.now()}`,
-        titulo,
-        descricao,
-        origem: "Solicitação",
-        solicitanteNome: nome,
-        solicitanteEmail: email,
-        departamento,
-        anexos,
-        justificativaPrioridade: justificativaPrioridade || undefined,
-        justificativaPrazo: justificativaPrazo || undefined,
-        observacoes: observacoes || undefined,
-        prioridadeSugerida: PRIORIDADE_SUGERIDA[prioridade],
-        prioridadeFinal: PRIORIDADE_FINAL[prioridade],
-        faseAtualId: "solicitacoes",
-        dataInicio: isoHoje(),
-        prazo: prazoData,
-        previsaoConclusao: "",
-        executoresPorFase: {},
-        estimativaPorFase: {},
-        participantesIds: [],
-        tagIds: [],
-        checklist: [],
-        comentarios: [],
-        historico: [
-          {
-            id: `h-${Date.now()}`,
-            data: new Date().toISOString(),
-            autorId: "sistema",
-            descricao: `${nome}, ${departamento}, abriu a solicitação da atividade "${titulo}"`,
-            faseId: "solicitacoes",
-          },
-        ],
-      });
-      setIsSubmitting(false);
-      setSubmitted(true);
-    }, 700);
+    // Rota pública (sem login) — chama a function `criar_solicitacao_publica` via RPC em vez de
+    // passar pelo task-store (que exige sessão autenticada por RLS). Ver
+    // supabase/migrations/0001_init_schema.sql.
+    const supabase = createClient();
+    const { error } = await supabase.rpc("criar_solicitacao_publica", {
+      p_titulo: titulo,
+      p_descricao: descricao,
+      p_departamento: departamento,
+      p_solicitante_email: email,
+      p_prioridade_sugerida: PRIORIDADE_SUGERIDA[prioridade],
+      p_solicitante_nome: nome,
+      p_justificativa_prioridade: justificativaPrioridade || null,
+      p_prazo: prazoData || null,
+      p_justificativa_prazo: justificativaPrazo || null,
+      p_observacoes: observacoes || null,
+      p_anexos: anexos,
+    });
+    setIsSubmitting(false);
+    if (error) {
+      console.error("Falha ao enviar solicitação:", error.message);
+      return;
+    }
+    setSubmitted(true);
   }
 
   if (submitted) {

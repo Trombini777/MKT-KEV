@@ -8,16 +8,15 @@ import { Button } from "@/components/ui/button";
 import { TipoTarefaSheet } from "@/components/tipo-tarefa-sheet";
 import { ColaboradorAvatar } from "@/components/colaborador-avatar";
 import { cn } from "@/lib/utils";
+import { etapaById, faseById, nomeColaborador, type TipoTarefa } from "@/lib/mock";
+import { useTiposTarefa, adicionarTipoTarefa, editarTipoTarefa } from "@/lib/tipo-tarefa-store";
 import {
-  TIPOS_TAREFA,
-  TAREFAS,
-  UNIDADES_MEDIDA,
-  etapaById,
-  faseById,
-  nomeColaborador,
-  type TipoTarefa,
-  type UnidadeMedida,
-} from "@/lib/mock";
+  useUnidadesMedida,
+  adicionarUnidadeMedida,
+  editarUnidadeMedida,
+  excluirUnidadeMedida,
+} from "@/lib/unidade-medida-store";
+import { useTasks } from "@/lib/task-store";
 
 function formatarData(iso: string): string {
   const [ano, mes, dia] = iso.split("-");
@@ -25,34 +24,15 @@ function formatarData(iso: string): string {
 }
 
 export function TiposDeTarefaBoard() {
-  const [tipos, setTipos] = useState<TipoTarefa[]>(TIPOS_TAREFA);
-  const [unidadesMedida, setUnidadesMedida] = useState<UnidadeMedida[]>(UNIDADES_MEDIDA);
+  const tipos = useTiposTarefa();
+  const unidadesMedida = useUnidadesMedida();
+  const tarefas = useTasks();
   const [tipoEditando, setTipoEditando] = useState<TipoTarefa | null>(null);
   const [versaoEdicao, setVersaoEdicao] = useState(0);
 
   function abrirEdicao(tipo: TipoTarefa) {
     setTipoEditando(tipo);
     setVersaoEdicao((v) => v + 1);
-  }
-
-  function adicionarTipo(tipo: TipoTarefa) {
-    setTipos((prev) => [...prev, tipo]);
-  }
-
-  function editarTipo(tipoAtualizado: TipoTarefa) {
-    setTipos((prev) => prev.map((t) => (t.id === tipoAtualizado.id ? tipoAtualizado : t)));
-  }
-
-  function adicionarUnidadeMedida(unidade: UnidadeMedida) {
-    setUnidadesMedida((prev) => [...prev, unidade]);
-  }
-
-  function editarUnidadeMedida(id: string, novoNome: string) {
-    setUnidadesMedida((prev) => prev.map((u) => (u.id === id ? { ...u, nome: novoNome } : u)));
-  }
-
-  function excluirUnidadeMedida(id: string) {
-    setUnidadesMedida((prev) => prev.filter((u) => u.id !== id));
   }
 
   return (
@@ -64,7 +44,7 @@ export function TiposDeTarefaBoard() {
           onCriarUnidadeMedida={adicionarUnidadeMedida}
           onEditarUnidadeMedida={editarUnidadeMedida}
           onExcluirUnidadeMedida={excluirUnidadeMedida}
-          onCriar={adicionarTipo}
+          onCriar={adicionarTipoTarefa}
         />
       </div>
 
@@ -75,7 +55,7 @@ export function TiposDeTarefaBoard() {
         onCriarUnidadeMedida={adicionarUnidadeMedida}
         onEditarUnidadeMedida={editarUnidadeMedida}
         onExcluirUnidadeMedida={excluirUnidadeMedida}
-        onEditar={editarTipo}
+        onEditar={editarTipoTarefa}
         tipoParaEditar={tipoEditando ?? undefined}
         open={tipoEditando !== null}
         onOpenChange={(v) => {
@@ -85,7 +65,7 @@ export function TiposDeTarefaBoard() {
 
       <div className="grid grid-cols-1 gap-2">
         {tipos.map((tipo) => {
-          const tarefasDoTipo = TAREFAS.filter((t) => t.tipoId === tipo.id);
+          const tarefasDoTipo = tarefas.filter((t) => t.tipoId === tipo.id);
           const tarefasAtivas = tarefasDoTipo.filter(
             (t) => !faseById(t.faseAtualId)?.isFinal
           ).length;

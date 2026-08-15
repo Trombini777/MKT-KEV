@@ -3,15 +3,16 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
-import { PROJETOS, colaboradorById, progressoProjeto, tarefasDoProjeto } from "@/lib/mock";
+import { colaboradorById, progressoProjeto, tarefasDoProjeto } from "@/lib/mock";
+import { getProjetos } from "@/lib/data/projetos";
 
 function formatData(iso: string) {
   const [ano, mes, dia] = iso.split("-");
   return `${dia}/${mes}/${ano}`;
 }
 
-export default function ProjetosPage() {
-  const projetos = PROJETOS.filter((p) => p.tipo === "Projeto");
+export default async function ProjetosPage() {
+  const projetos = (await getProjetos()).filter((p) => p.tipo === "Projeto");
 
   return (
     <div>

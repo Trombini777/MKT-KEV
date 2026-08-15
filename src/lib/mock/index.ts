@@ -9,7 +9,6 @@ export * from "./projetos";
 export * from "./executores-padrao";
 export * from "./usuarios";
 export * from "./tarefas";
-export * from "./current-user";
 export * from "./workload";
 export * from "./dashboards";
 

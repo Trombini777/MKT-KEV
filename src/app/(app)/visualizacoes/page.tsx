@@ -13,7 +13,7 @@ import { WorkloadView } from "@/components/workload-view";
 import { cn } from "@/lib/utils";
 import { isoHoje, diasEntre } from "@/lib/hoje";
 import { useTasks, addTask, moveTask } from "@/lib/task-store";
-import { FASES, TIPOS_TAREFA, USUARIO_ATUAL_ID } from "@/lib/mock";
+import { FASES, TIPOS_TAREFA } from "@/lib/mock";
 
 const PRIMEIRA_FASE = [...FASES].sort((a, b) => a.ordem - b.ordem)[0];
 
@@ -29,7 +29,6 @@ export default function VisualizacoesPage() {
       return;
     }
     addTask({
-      id: `tarefa-${Date.now()}`,
       titulo,
       descricao: "",
       tipoId: TIPOS_TAREFA[0]?.id ?? "",
@@ -37,22 +36,6 @@ export default function VisualizacoesPage() {
       prioridadeFinal: "Normal",
       faseAtualId: PRIMEIRA_FASE?.id ?? "",
       dataInicio: isoHoje(),
-      prazo: "",
-      previsaoConclusao: "",
-      executoresPorFase: {},
-      estimativaPorFase: {},
-      participantesIds: [],
-      tagIds: [],
-      checklist: [],
-      comentarios: [],
-      historico: [
-        {
-          id: `h-${Date.now()}`,
-          data: new Date().toISOString(),
-          autorId: USUARIO_ATUAL_ID,
-          descricao: "Tarefa criada",
-        },
-      ],
     });
     setNovoTitulo("");
     setCriando(false);

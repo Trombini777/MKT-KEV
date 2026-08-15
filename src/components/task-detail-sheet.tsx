@@ -8,6 +8,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { PriorityBadge } from "@/components/priority-badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -23,9 +25,18 @@ import {
   atualizarTipoTarefa,
   definirRespostaTriagem,
   atribuirResponsavelEtapa,
+  avancarEtapaPlanejamento,
+  adicionarComentario,
+  alternarChecklistItem,
+  adicionarChecklistItem,
+  adicionarAnexo,
+  adicionarLink,
+  ajustarEtapaEmExecucao,
+  CATEGORIA_PARA_FASE,
 } from "@/lib/task-store";
 import {
   faseById,
+  etapaById,
   nomeTipo,
   nomeTag,
   nomeColaborador,
@@ -46,13 +57,21 @@ import {
   Heading,
   AlignLeft,
   Paperclip,
+  Link2,
+  Plus,
+  Check,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  ChevronDown,
   ArrowRight,
   AlertTriangle,
   MessageSquareText,
   Hash,
   Calendar,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 function formatData(iso: string) {
   if (!iso) return "-";
@@ -148,9 +167,17 @@ export function TaskDetailSheet() {
   const tarefaId = searchParams.get("tarefa");
   const tasks = useTasks();
   const tarefa = tarefaId ? tasks.find((t) => t.id === tarefaId) : undefined;
-  const [checklist, setChecklist] = useState<Record<string, boolean>>({});
   const [historicoColapsado, setHistoricoColapsado] = useState<Record<string, boolean>>({});
   const [atribuindoResponsavel, setAtribuindoResponsavel] = useState(false);
+  const [novoChecklistItem, setNovoChecklistItem] = useState("");
+  const [novoComentario, setNovoComentario] = useState("");
+  const [novoLink, setNovoLink] = useState("");
+  const [editandoEtapaAtual, setEditandoEtapaAtual] = useState(false);
+  const [dataEtapaInput, setDataEtapaInput] = useState("");
+  const [horasEtapaInput, setHorasEtapaInput] = useState("");
+  const [etapaVisualizadaOrdem, setEtapaVisualizadaOrdem] = useState<number | null>(null);
+  const [sequenciaAberta, setSequenciaAberta] = useState(false);
+  const comentarioInputRef = useRef<HTMLInputElement>(null);
 
   function close() {
     const params = new URLSearchParams(searchParams.toString());
@@ -170,12 +197,75 @@ export function TaskDetailSheet() {
   const fase = faseById(tarefa.faseAtualId);
   const projeto = tarefa.projetoId ? projetoById(tarefa.projetoId) : undefined;
   const emRisco = estaEmRisco(tarefa);
-  const destinos = destinosPermitidos(tarefa.faseAtualId);
   const executoresFaseAtual = tarefa.executoresPorFase[tarefa.faseAtualId] ?? [];
   const estimativaFaseAtual = tarefa.estimativaPorFase[tarefa.faseAtualId];
   const historicoComFase = tarefa.historico.filter((h) => h.faseId);
   const historicoLegado = tarefa.historico.filter((h) => !h.faseId);
   const decisaoAprovacao = [...tarefa.historico].reverse().find((h) => h.acao)?.acao;
+
+  // Navegação da barra inferior: percorre as etapas do fluxo de trabalho sem depender de qual
+  // delas está "em execução" agora — dá pra olhar qualquer uma, só edita/avança a atual.
+  const etapasPlano = tarefa.planejamento
+    ? [...tarefa.planejamento.etapas].sort((a, b) => a.ordem - b.ordem)
+    : [];
+  const maxOrdemPlano = etapasPlano.length > 0 ? etapasPlano[etapasPlano.length - 1].ordem : 0;
+  // `etapaAtualOrdem` passa de maxOrdemPlano pra maxOrdemPlano + 1 ao concluir a última etapa
+  // (ver avancarEtapaPlanejamento) — esse é o sinal inequívoco de "fluxo de etapas terminou".
+  const planoFinalizado =
+    tarefa.planejamento != null && tarefa.planejamento.etapaAtualOrdem > maxOrdemPlano;
+  const fluxoEmAndamento = tarefa.planejamento != null && !planoFinalizado;
+  // Enquanto o fluxo de etapas ainda não terminou, a fase é resincronizada automaticamente pela
+  // categoria da etapa atual (ver avancarEtapaPlanejamento) — por isso os botões manuais de
+  // "pular" pra Aprovação/Concluído ficam escondidos aqui: só "pede ajuste" (voltar) continua
+  // disponível a qualquer momento como válvula de escape.
+  const bloqueiaDestinoManual = (destinoId: string) =>
+    fluxoEmAndamento &&
+    ((tarefa.faseAtualId === "em-execucao" && destinoId === "aprovacao") ||
+      (tarefa.faseAtualId === "aprovacao" && destinoId === "concluido"));
+  const destinosBrutos = destinosPermitidos(tarefa.faseAtualId);
+  const etapasBloqueiamAvanco = destinosBrutos.some((d) => bloqueiaDestinoManual(d));
+  const destinos = destinosBrutos.filter((d) => !bloqueiaDestinoManual(d));
+  // Uma vez finalizado o fluxo, ordemPadrao fica presa na última etapa real (em vez do ponteiro
+  // já avançado, que não existe na lista) — assim a barra de baixo continua navegável em modo
+  // somente-leitura em vez de sumir.
+  const ordemPadrao = tarefa.planejamento
+    ? Math.min(tarefa.planejamento.etapaAtualOrdem, maxOrdemPlano || 1)
+    : (etapasPlano[0]?.ordem ?? 1);
+  const ordemVisualizadaValida =
+    etapaVisualizadaOrdem != null && etapasPlano.some((e) => e.ordem === etapaVisualizadaOrdem);
+  const ordemVisualizada = ordemVisualizadaValida ? etapaVisualizadaOrdem! : ordemPadrao;
+  const indexVisualizado = etapasPlano.findIndex((e) => e.ordem === ordemVisualizada);
+  const etapaVisualizada = indexVisualizado >= 0 ? etapasPlano[indexVisualizado] : undefined;
+  const infoEtapaVisualizada = etapaVisualizada ? etapaById(etapaVisualizada.etapaId) : undefined;
+  const horasEtapaVisualizada = etapaVisualizada
+    ? etapaVisualizada.alocacoes.reduce((soma, a) => soma + a.horas, 0)
+    : 0;
+  const visualizandoAtual =
+    tarefa.planejamento != null && ordemVisualizada === tarefa.planejamento.etapaAtualOrdem;
+  const podeEditarEtapaVisualizada = visualizandoAtual && fluxoEmAndamento;
+  const ultimaEtapa =
+    etapasPlano.length > 0 ? etapasPlano[etapasPlano.length - 1].ordem === ordemVisualizada : false;
+  // Fase que a próxima etapa (ou, na última, a própria etapa visualizada) vai sincronizar ao
+  // clicar "avançar" — usado só pra deixar o rótulo do botão final explícito sobre o destino.
+  const etapaQueDefineProximaFase = ultimaEtapa
+    ? etapaVisualizada
+    : etapasPlano[indexVisualizado + 1];
+  const categoriaProximaFase = etapaQueDefineProximaFase
+    ? etapaById(etapaQueDefineProximaFase.etapaId)?.categoria
+    : undefined;
+  const faseAoAvancar = categoriaProximaFase ? CATEGORIA_PARA_FASE[categoriaProximaFase] : undefined;
+  // Rótulo do pill de "mover etapa": aponta pro nome da próxima etapa — ou, na última, pro
+  // nome da fase de destino, já que não há próxima etapa pra apontar.
+  const proximaEtapaParaAvancar = !ultimaEtapa ? etapasPlano[indexVisualizado + 1] : undefined;
+  const rotuloAvancoEtapa = proximaEtapaParaAvancar
+    ? (etapaById(proximaEtapaParaAvancar.etapaId)?.nome ?? "Próxima etapa")
+    : (faseAoAvancar ? faseById(faseAoAvancar)?.nome : undefined) ?? "Concluir";
+
+  // Etapa atual "de verdade" (não a que está sendo navegada/visualizada) — usada na Coluna 2.
+  const etapaAtualPlano = tarefa.planejamento
+    ? etapasPlano.find((e) => e.ordem === ordemPadrao)
+    : undefined;
+  const infoEtapaAtualPlano = etapaAtualPlano ? etapaById(etapaAtualPlano.etapaId) : undefined;
 
   return (
     <Dialog open onOpenChange={(open) => !open && close()}>
@@ -442,12 +532,14 @@ export function TaskDetailSheet() {
           {/* Coluna 2 — o que fazer nessa etapa */}
           <ScrollArea className="min-h-0 min-w-0 md:h-full">
             <div className="flex flex-col gap-5 p-5">
-              <div>
-                <ColunaLabel>Fase atual</ColunaLabel>
-                <span className="mt-2 inline-flex rounded-full bg-primary/15 px-3 py-1 text-sm font-semibold text-primary">
-                  {fase?.nome}
-                </span>
-              </div>
+              {tarefa.planejamento ? (
+                <div>
+                  <ColunaLabel>Etapa atual</ColunaLabel>
+                  <span className="mt-2 inline-flex rounded-full bg-primary/15 px-3 py-1 text-sm font-semibold text-primary">
+                    {infoEtapaAtualPlano?.nome ?? "—"}
+                  </span>
+                </div>
+              ) : null}
 
               {tarefa.faseAtualId === "solicitacoes" ? (
                 <div>
@@ -605,7 +697,7 @@ export function TaskDetailSheet() {
                     />
                   )}
                 </>
-              ) : (
+              ) : tarefa.planejamento ? null : (
                 <div>
                   <ColunaLabel>Responsável pela etapa</ColunaLabel>
                   {executoresFaseAtual.length === 0 ? (
@@ -632,39 +724,120 @@ export function TaskDetailSheet() {
                 </div>
               )}
 
-              {tarefa.checklist.length > 0 && (
-                <div>
-                  <ColunaLabel>Checklist</ColunaLabel>
-                  <div className="mt-2 flex flex-col gap-1.5">
-                    {tarefa.checklist.map((item) => {
-                      const feito = checklist[item.id] ?? item.feito;
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() =>
-                            setChecklist((prev) => ({ ...prev, [item.id]: !feito }))
-                          }
-                          className="flex items-center gap-2 text-left text-sm"
-                        >
-                          {feito ? (
-                            <CheckSquare className="size-4 shrink-0 text-primary" />
-                          ) : (
-                            <Square className="size-4 shrink-0 text-muted-foreground" />
-                          )}
-                          <span className={feito ? "text-muted-foreground line-through" : ""}>
-                            {item.texto}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
+              <div>
+                <ColunaLabel>Checklist</ColunaLabel>
+                <div className="mt-2 flex flex-col gap-1.5">
+                  {tarefa.checklist.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => alternarChecklistItem(tarefa.id, item.id)}
+                      className="flex items-center gap-2 text-left text-sm"
+                    >
+                      {item.feito ? (
+                        <CheckSquare className="size-4 shrink-0 text-primary" />
+                      ) : (
+                        <Square className="size-4 shrink-0 text-muted-foreground" />
+                      )}
+                      <span className={item.feito ? "text-muted-foreground line-through" : ""}>
+                        {item.texto}
+                      </span>
+                    </button>
+                  ))}
                 </div>
-              )}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    adicionarChecklistItem(tarefa.id, novoChecklistItem);
+                    setNovoChecklistItem("");
+                  }}
+                  className="mt-2 flex items-center gap-1.5"
+                >
+                  <Input
+                    value={novoChecklistItem}
+                    onChange={(e) => setNovoChecklistItem(e.target.value)}
+                    placeholder="Novo item do checklist"
+                    className="h-8 text-sm"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!novoChecklistItem.trim()}
+                    className="shrink-0 text-muted-foreground hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label="Adicionar item"
+                  >
+                    <Plus className="size-4" />
+                  </button>
+                </form>
+              </div>
 
-              {tarefa.comentarios.length > 0 && (
-                <div>
-                  <ColunaLabel>Comentários</ColunaLabel>
+              <div>
+                <ColunaLabel>Anexos e links</ColunaLabel>
+                <div className="mt-2 flex flex-col gap-1.5">
+                  {(tarefa.anexos ?? []).map((nome, i) => (
+                    <div key={`anexo-${i}`} className="flex items-center gap-2 text-sm">
+                      <Paperclip className="size-3.5 shrink-0 text-muted-foreground" />
+                      <span className="truncate">{nome}</span>
+                    </div>
+                  ))}
+                  {(tarefa.links ?? []).map((url, i) => (
+                    <a
+                      key={`link-${i}`}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-sm text-primary hover:underline"
+                    >
+                      <Link2 className="size-3.5 shrink-0" />
+                      <span className="truncate">{url}</span>
+                    </a>
+                  ))}
+                  {(tarefa.anexos ?? []).length === 0 && (tarefa.links ?? []).length === 0 && (
+                    <p className="text-xs text-muted-foreground">Nenhum anexo ou link ainda.</p>
+                  )}
+                </div>
+                <div className="mt-2 flex flex-col gap-1.5">
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      adicionarLink(tarefa.id, novoLink);
+                      setNovoLink("");
+                    }}
+                    className="flex items-center gap-1.5"
+                  >
+                    <Input
+                      value={novoLink}
+                      onChange={(e) => setNovoLink(e.target.value)}
+                      placeholder="Colar um link"
+                      className="h-8 text-sm"
+                    />
+                    <button
+                      type="submit"
+                      disabled={!novoLink.trim()}
+                      className="shrink-0 text-muted-foreground hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
+                      aria-label="Adicionar link"
+                    >
+                      <Plus className="size-4" />
+                    </button>
+                  </form>
+                  <label className="flex w-fit cursor-pointer items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground">
+                    <Paperclip className="size-3.5" />
+                    Anexar arquivo
+                    <input
+                      type="file"
+                      className="hidden"
+                      onChange={(e) => {
+                        const arquivo = e.target.files?.[0];
+                        if (arquivo) adicionarAnexo(tarefa.id, arquivo.name);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <ColunaLabel>Comentários</ColunaLabel>
+                {tarefa.comentarios.length > 0 && (
                   <div className="mt-2 flex flex-col gap-3">
                     {tarefa.comentarios.map((c) => (
                       <div key={c.id} className="flex gap-2">
@@ -682,8 +855,32 @@ export function TaskDetailSheet() {
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
+                )}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    adicionarComentario(tarefa.id, novoComentario);
+                    setNovoComentario("");
+                  }}
+                  className="mt-2 flex items-center gap-1.5"
+                >
+                  <Input
+                    ref={comentarioInputRef}
+                    value={novoComentario}
+                    onChange={(e) => setNovoComentario(e.target.value)}
+                    placeholder="Adicionar comentário"
+                    className="h-8 text-sm"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!novoComentario.trim()}
+                    className="shrink-0 text-muted-foreground hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label="Comentar"
+                  >
+                    <Plus className="size-4" />
+                  </button>
+                </form>
+              </div>
 
             </div>
           </ScrollArea>
@@ -691,9 +888,20 @@ export function TaskDetailSheet() {
           {/* Coluna 3 — mover card para fase */}
           <ScrollArea className="min-h-0 min-w-0 md:h-full">
             <div className="flex flex-col gap-3 p-5">
+              <div>
+                <ColunaLabel>Fase atual</ColunaLabel>
+                <span className="mt-2 inline-flex rounded-full bg-primary/15 px-3 py-1 text-sm font-semibold text-primary">
+                  {fase?.nome}
+                </span>
+              </div>
+
               <ColunaLabel>Mover card para fase</ColunaLabel>
               {destinos.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Fase final do fluxo.</p>
+                <p className="text-sm text-muted-foreground">
+                  {etapasBloqueiamAvanco
+                    ? "Conclua as etapas do fluxo de trabalho (barra de baixo) para avançar de fase."
+                    : "Fase final do fluxo."}
+                </p>
               ) : (
                 <div className="flex flex-col gap-2">
                   {destinos.map((destinoId) => (
@@ -712,6 +920,209 @@ export function TaskDetailSheet() {
             </div>
           </ScrollArea>
         </div>
+
+        {tarefa.planejamento && etapaVisualizada && (
+          <div className="flex flex-shrink-0 flex-wrap items-center gap-4 border-t border-border/60 bg-card px-4 py-2.5">
+            <button
+              type="button"
+              onClick={() => {
+                comentarioInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                comentarioInputRef.current?.focus();
+              }}
+              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90"
+              aria-label="Ir para comentários"
+            >
+              <MessageSquareText className="size-4" />
+            </button>
+
+            <div className="flex shrink-0 items-center gap-0.5">
+              <button
+                type="button"
+                onClick={() => setEtapaVisualizadaOrdem(etapasPlano[indexVisualizado - 1].ordem)}
+                disabled={indexVisualizado <= 0}
+                className="rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
+                aria-label="Etapa anterior"
+              >
+                <ChevronLeft className="size-4" />
+              </button>
+
+              <Popover open={sequenciaAberta} onOpenChange={setSequenciaAberta}>
+                <PopoverTrigger
+                  render={
+                    <button
+                      type="button"
+                      className="flex items-center gap-2 rounded-full px-2 py-1 hover:bg-muted"
+                    />
+                  }
+                >
+                  <ColaboradorAvatar
+                    colaboradorId={etapaVisualizada.colaboradorId}
+                    className="size-7 shrink-0"
+                    fallbackClassName="text-xs"
+                  />
+                  <span className="text-sm font-medium whitespace-nowrap">
+                    {infoEtapaVisualizada?.nome ?? etapaVisualizada.etapaId}
+                  </span>
+                  {sequenciaAberta ? (
+                    <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
+                  ) : (
+                    <ChevronUp className="size-4 shrink-0 text-muted-foreground" />
+                  )}
+                </PopoverTrigger>
+                <PopoverContent side="top" align="center" className="w-72 p-1.5">
+                  <p className="px-2 py-1 text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase">
+                    Sequência da atividade
+                  </p>
+                  <div className="flex flex-col gap-0.5">
+                    {etapasPlano.map((etapa) => {
+                      const info = etapaById(etapa.etapaId);
+                      const concluida =
+                        !fluxoEmAndamento || etapa.ordem < (tarefa.planejamento?.etapaAtualOrdem ?? 1);
+                      const atual = fluxoEmAndamento && etapa.ordem === tarefa.planejamento?.etapaAtualOrdem;
+                      return (
+                        <button
+                          key={etapa.ordem}
+                          type="button"
+                          onClick={() => {
+                            setEtapaVisualizadaOrdem(etapa.ordem);
+                            setSequenciaAberta(false);
+                          }}
+                          className={cn(
+                            "flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted",
+                            etapa.ordem === ordemVisualizada && "bg-muted"
+                          )}
+                        >
+                          {concluida ? (
+                            <CheckSquare className="size-3.5 shrink-0 text-primary" />
+                          ) : atual ? (
+                            <span className="flex size-3.5 shrink-0 items-center justify-center rounded-full bg-primary text-[0.55rem] font-bold text-primary-foreground">
+                              {etapa.ordem}
+                            </span>
+                          ) : (
+                            <Square className="size-3.5 shrink-0 text-muted-foreground" />
+                          )}
+                          <span className={cn("min-w-0 flex-1 truncate", concluida && "text-muted-foreground line-through")}>
+                            {info?.nome ?? etapa.etapaId}
+                          </span>
+                          <ColaboradorAvatar
+                            colaboradorId={etapa.colaboradorId}
+                            className="size-5 shrink-0"
+                            fallbackClassName="text-[0.55rem]"
+                          />
+                          <span className="shrink-0 text-xs text-muted-foreground">
+                            {formatData(etapa.dataFim)}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </PopoverContent>
+              </Popover>
+
+              <button
+                type="button"
+                onClick={() => setEtapaVisualizadaOrdem(etapasPlano[indexVisualizado + 1].ordem)}
+                disabled={indexVisualizado >= etapasPlano.length - 1}
+                className="rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
+                aria-label="Próxima etapa"
+              >
+                <ChevronRight className="size-4" />
+              </button>
+            </div>
+
+            {!editandoEtapaAtual ? (
+              <button
+                type="button"
+                disabled={!podeEditarEtapaVisualizada}
+                onClick={() => {
+                  setDataEtapaInput(etapaVisualizada.dataFim);
+                  setHorasEtapaInput(String(horasEtapaVisualizada));
+                  setEditandoEtapaAtual(true);
+                }}
+                className="flex shrink-0 items-center gap-1.5 text-sm"
+              >
+                <span className="text-xs text-muted-foreground">Executar etapa até</span>
+                <span
+                  className={cn(
+                    "flex items-center gap-1 font-medium",
+                    podeEditarEtapaVisualizada
+                      ? "text-destructive underline decoration-dotted underline-offset-2"
+                      : "text-foreground"
+                  )}
+                >
+                  <Calendar className="size-3.5 shrink-0" />
+                  {formatData(etapaVisualizada.dataFim)}
+                </span>
+              </button>
+            ) : (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-xs text-muted-foreground">Executar etapa até</span>
+                <Input
+                  type="date"
+                  autoFocus
+                  value={dataEtapaInput}
+                  onChange={(e) => setDataEtapaInput(e.target.value)}
+                  className="h-7 w-36 text-xs"
+                />
+                <Input
+                  type="number"
+                  min={0}
+                  step={0.5}
+                  value={horasEtapaInput}
+                  onChange={(e) => setHorasEtapaInput(e.target.value)}
+                  className="h-7 w-16 text-xs"
+                />
+                <span className="text-xs text-muted-foreground">h</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!dataEtapaInput) return;
+                    ajustarEtapaEmExecucao(
+                      tarefa.id,
+                      etapaVisualizada.ordem,
+                      dataEtapaInput,
+                      Number(horasEtapaInput) || 0
+                    );
+                    setEditandoEtapaAtual(false);
+                  }}
+                  className="shrink-0 text-success"
+                  aria-label="Salvar"
+                >
+                  <Check className="size-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditandoEtapaAtual(false)}
+                  className="shrink-0 text-muted-foreground"
+                  aria-label="Cancelar"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+            )}
+
+            <span className="shrink-0 text-sm text-muted-foreground">
+              Concluir tarefa até{" "}
+              <span className="font-medium text-foreground">
+                {formatData(tarefa.prazo || tarefa.planejamento.previsaoConclusao)}
+              </span>
+            </span>
+
+            {podeEditarEtapaVisualizada && (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditandoEtapaAtual(false);
+                  avancarEtapaPlanejamento(tarefa.id);
+                }}
+                className="group ml-auto flex shrink-0 items-center gap-2 rounded-full bg-secondary px-4 py-2 text-sm font-semibold text-secondary-foreground transition-colors hover:bg-primary hover:text-primary-foreground"
+              >
+                {rotuloAvancoEtapa}
+                <ArrowRight className="size-4 shrink-0 transition-transform group-hover:translate-x-0.5" />
+              </button>
+            )}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { useEtapas, adicionarEtapa, editarEtapa, excluirEtapa as removerEtapa } from "@/lib/etapa-store";
 import { type CategoriaEtapa, type EtapaTarefa } from "@/lib/mock";
 
-const CATEGORIAS: CategoriaEtapa[] = ["A fazer", "Em andamento", "Concluído"];
+const CATEGORIAS: CategoriaEtapa[] = ["Backlog", "Em Execução", "Em Aprovação", "Concluído"];
 
 export function EtapasBoard() {
   const etapas = useEtapas();
@@ -51,7 +51,7 @@ export function EtapasBoard() {
   }
 
   return (
-    <div className="grid gap-4 sm:grid-cols-3">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {CATEGORIAS.map((categoria) => {
         const itens = etapas.filter((e) => e.categoria === categoria);
         return (

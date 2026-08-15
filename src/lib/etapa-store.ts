@@ -2,13 +2,13 @@
 
 import { useEffect, useSyncExternalStore } from "react";
 import { ETAPAS, type EtapaTarefa } from "@/lib/mock";
+import { createClient } from "@/lib/supabase/client";
 
-// Diferente do task-store.ts (que reatribui a variável), aqui mutamos o array ETAPAS *no
+// Diferente dos outros stores (que reatribuem a variável), aqui mutamos o array ETAPAS *no
 // próprio lugar* (push/splice) — assim quem importa `ETAPAS`/`etapaById` direto (ex.:
 // tipo-tarefa-sheet.tsx, os cartões de tarefa) continua vendo os dados atualizados sem precisar
-// trocar pra um hook, já que é a mesma referência de array sendo alterada em memória.
-const STORAGE_KEY = "kev-marketing:etapas";
-
+// trocar pra um hook, já que é a mesma referência de array sendo alterada em memória. Os campos
+// da tabela `etapas` batem 1:1 com EtapaTarefa (id/nome/categoria), sem precisar de alias.
 let hidratado = false;
 let snapshot: EtapaTarefa[] = [...ETAPAS];
 const listeners = new Set<() => void>();
@@ -18,29 +18,18 @@ function emit() {
   for (const listener of listeners) listener();
 }
 
-function persistir() {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(ETAPAS));
-  } catch {
-    // localStorage indisponível — ignora.
-  }
-}
-
-function hidratar() {
-  if (hidratado || typeof window === "undefined") return;
+async function hidratar() {
+  if (hidratado) return;
   hidratado = true;
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const salvas = JSON.parse(raw) as EtapaTarefa[];
-      ETAPAS.length = 0;
-      ETAPAS.push(...salvas);
-      emit();
-    }
-  } catch {
-    // dado corrompido ou localStorage indisponível — mantém o seed inicial.
+  const supabase = createClient();
+  const { data, error } = await supabase.from("etapas").select("id, nome, categoria").order("nome");
+  if (error) {
+    console.error("Falha ao carregar etapas:", error.message);
+    return;
   }
+  ETAPAS.length = 0;
+  ETAPAS.push(...((data ?? []) as EtapaTarefa[]));
+  emit();
 }
 
 function subscribe(listener: () => void) {
@@ -59,24 +48,47 @@ export function useEtapas(): EtapaTarefa[] {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
-export function adicionarEtapa(etapa: EtapaTarefa) {
-  ETAPAS.push(etapa);
-  persistir();
+/** `etapa.id` recebido é ignorado na criação — o Postgres gera o uuid real. */
+export async function adicionarEtapa(etapa: EtapaTarefa) {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("etapas")
+    .insert({ nome: etapa.nome, categoria: etapa.categoria })
+    .select("id, nome, categoria")
+    .single();
+  if (error || !data) {
+    console.error("Falha ao criar etapa:", error?.message);
+    return;
+  }
+  ETAPAS.push(data as EtapaTarefa);
   emit();
 }
 
-export function editarEtapa(id: string, patch: Partial<EtapaTarefa>) {
+export async function editarEtapa(id: string, patch: Partial<EtapaTarefa>) {
+  const supabase = createClient();
+  const linha: Record<string, unknown> = {};
+  if (patch.nome !== undefined) linha.nome = patch.nome;
+  if (patch.categoria !== undefined) linha.categoria = patch.categoria;
+  const { error } = await supabase.from("etapas").update(linha).eq("id", id);
+  if (error) {
+    console.error("Falha ao editar etapa:", error.message);
+    return;
+  }
   const idx = ETAPAS.findIndex((e) => e.id === id);
   if (idx === -1) return;
   ETAPAS[idx] = { ...ETAPAS[idx], ...patch };
-  persistir();
   emit();
 }
 
-export function excluirEtapa(id: string) {
+export async function excluirEtapa(id: string) {
+  const supabase = createClient();
+  const { error } = await supabase.from("etapas").delete().eq("id", id);
+  if (error) {
+    console.error("Falha ao excluir etapa:", error.message);
+    return;
+  }
   const idx = ETAPAS.findIndex((e) => e.id === id);
   if (idx === -1) return;
   ETAPAS.splice(idx, 1);
-  persistir();
   emit();
 }

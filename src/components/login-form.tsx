@@ -1,24 +1,31 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { iniciarSessao } from "@/lib/auth";
+import { login } from "@/lib/auth";
 
 const FIELD_LABEL_CLASS = "text-xs font-semibold tracking-wider text-muted-foreground uppercase";
 
 export function LoginForm() {
-  const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    // Login mock — sem Supabase Auth ainda (ver docs/PLAN.md, M0): aceita qualquer credencial.
+    setErro(null);
     setIsSubmitting(true);
-    iniciarSessao();
-    router.push("/painel");
+    const formData = new FormData(event.currentTarget);
+    const resultado = await login(
+      String(formData.get("email")),
+      String(formData.get("password"))
+    );
+    if (resultado?.erro) {
+      setErro(resultado.erro);
+      setIsSubmitting(false);
+    }
+    // Em caso de sucesso, `login` já faz o redirect no servidor.
   }
 
   return (
@@ -50,6 +57,7 @@ export function LoginForm() {
           required
         />
       </div>
+      {erro && <p className="text-sm text-destructive">{erro}</p>}
       <Button type="submit" size="lg" className="mt-1 h-11 w-full text-base" disabled={isSubmitting}>
         {isSubmitting ? "Entrando…" : "Entrar"}
       </Button>

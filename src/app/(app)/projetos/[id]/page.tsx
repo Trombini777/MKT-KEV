@@ -5,12 +5,8 @@ import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { TaskListRow } from "@/components/task-list-row";
-import {
-  PROJETOS,
-  colaboradorById,
-  progressoProjeto,
-  tarefasDoProjeto,
-} from "@/lib/mock";
+import { colaboradorById, progressoProjeto, tarefasDoProjeto } from "@/lib/mock";
+import { getProjetos } from "@/lib/data/projetos";
 import { ChevronLeft } from "lucide-react";
 
 function formatData(iso: string) {
@@ -20,7 +16,8 @@ function formatData(iso: string) {
 
 export default async function ProjetoDetalhePage(props: PageProps<"/projetos/[id]">) {
   const { id } = await props.params;
-  const projeto = PROJETOS.find((p) => p.id === id);
+  const projetos = await getProjetos();
+  const projeto = projetos.find((p) => p.id === id);
   if (!projeto) notFound();
 
   const responsavel = colaboradorById(projeto.responsavelId);

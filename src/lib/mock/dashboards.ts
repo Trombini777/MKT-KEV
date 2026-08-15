@@ -3,12 +3,17 @@ import { COLABORADORES } from "./colaboradores";
 import { FASES } from "./fluxo";
 import { DEPARTAMENTOS } from "../departamentos";
 import { estaEmRisco } from "./tarefas";
+import type { Tarefa, Colaborador } from "./types";
 
-export function resumoProdutividade() {
+// `tarefas`/`colaboradores` são parâmetros opcionais (default nos arrays mock) só pra manter
+// compatibilidade — quem consome de verdade (dashboards/page.tsx) passa os dados ao vivo do
+// Supabase via useTasks()/useColaboradores(), não o seed estático.
+
+export function resumoProdutividade(tarefas: Tarefa[] = TAREFAS) {
   const hoje = new Date();
   const em7dias = new Date(hoje.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-  const ativas = TAREFAS.filter((t) => t.faseAtualId !== "concluido");
+  const ativas = tarefas.filter((t) => t.faseAtualId !== "concluido");
   const aVencer = ativas.filter(
     (t) => t.prazo && new Date(t.prazo) >= hoje && new Date(t.prazo) <= em7dias
   );
@@ -23,42 +28,44 @@ export function resumoProdutividade() {
   };
 }
 
-export function atividadesPorPessoa() {
-  return COLABORADORES.map((c) => {
-    const ativas = TAREFAS.filter(
-      (t) =>
-        t.faseAtualId !== "concluido" &&
-        (t.executoresPorFase[t.faseAtualId] ?? []).includes(c.id)
-    ).length;
-    const concluidas = TAREFAS.filter(
-      (t) => t.faseAtualId === "concluido" && (t.executoresPorFase["em-execucao"] ?? []).includes(c.id)
-    ).length;
-    return { colaborador: c, ativas, concluidas };
-  }).sort((a, b) => b.ativas - a.ativas);
+export function atividadesPorPessoa(tarefas: Tarefa[] = TAREFAS, colaboradores: Colaborador[] = COLABORADORES) {
+  return colaboradores
+    .map((c) => {
+      const ativas = tarefas.filter(
+        (t) =>
+          t.faseAtualId !== "concluido" &&
+          (t.executoresPorFase[t.faseAtualId] ?? []).includes(c.id)
+      ).length;
+      const concluidas = tarefas.filter(
+        (t) => t.faseAtualId === "concluido" && (t.executoresPorFase["em-execucao"] ?? []).includes(c.id)
+      ).length;
+      return { colaborador: c, ativas, concluidas };
+    })
+    .sort((a, b) => b.ativas - a.ativas);
 }
 
-export function atividadesPorEtapa() {
+export function atividadesPorEtapa(tarefas: Tarefa[] = TAREFAS) {
   return FASES.map((f) => ({
     fase: f,
-    total: TAREFAS.filter((t) => t.faseAtualId === f.id).length,
+    total: tarefas.filter((t) => t.faseAtualId === f.id).length,
   }));
 }
 
-export function atividadesPorSquad() {
+export function atividadesPorSquad(tarefas: Tarefa[] = TAREFAS, colaboradores: Colaborador[] = COLABORADORES) {
   const squads = new Map<string, number>();
-  for (const t of TAREFAS) {
+  for (const t of tarefas) {
     const executorId = t.executoresPorFase[t.faseAtualId]?.[0];
     if (!executorId) continue;
-    const colaborador = COLABORADORES.find((c) => c.id === executorId);
+    const colaborador = colaboradores.find((c) => c.id === executorId);
     if (!colaborador) continue;
     squads.set(colaborador.squadId, (squads.get(colaborador.squadId) ?? 0) + 1);
   }
   return squads;
 }
 
-export function atividadesPorDepartamento() {
+export function atividadesPorDepartamento(tarefas: Tarefa[] = TAREFAS) {
   const contagem = new Map<string, number>();
-  for (const t of TAREFAS) {
+  for (const t of tarefas) {
     if (t.origem !== "Solicitação" || !t.departamento) continue;
     contagem.set(t.departamento, (contagem.get(t.departamento) ?? 0) + 1);
   }
