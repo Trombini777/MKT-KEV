@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { useRef, useState } from "react";
+import { Camera, Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Dialog,
   DialogContent,
@@ -21,9 +22,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { createClient } from "@/lib/supabase/client";
 import { SQUADS, type Colaborador, type StatusColaborador } from "@/lib/mock";
 
 const STATUS_OPCOES: StatusColaborador[] = ["Ativo", "Em Licença", "Inativo"];
+
+// Ordem hierárquica de cima pra baixo — do mais sênior pro mais júnior. Times são todos de
+// Marketing, então o cargo já vem com o sufixo — evita duplicidade tipo "Superintendente" (aqui)
+// vs. "Superintendente de Marketing" (dado real) aparecendo como duas opções diferentes.
+const CARGOS_OPCOES = [
+  "Superintendente de Marketing",
+  "Gerente de Marketing",
+  "Coordenador de Marketing",
+  "Analista de Marketing Sênior",
+  "Analista de Marketing Pleno",
+  "Analista de Marketing Júnior",
+] as const;
 
 function iniciaisDoNome(nome: string): string {
   const partes = nome.trim().split(/\s+/).filter(Boolean);
@@ -62,6 +76,9 @@ export function ColaboradorSheet({
   const [email, setEmail] = useState(colaboradorParaEditar?.email ?? "");
   const [whatsapp, setWhatsapp] = useState(colaboradorParaEditar?.whatsapp ?? "");
   const [dataNascimento, setDataNascimento] = useState(colaboradorParaEditar?.dataNascimento ?? "");
+  const [avatarUrl, setAvatarUrl] = useState(colaboradorParaEditar?.avatarUrl ?? "");
+  const [enviandoFoto, setEnviandoFoto] = useState(false);
+  const inputFotoRef = useRef<HTMLInputElement>(null);
 
   function resetar() {
     setNome(colaboradorParaEditar?.nome ?? "");
@@ -72,6 +89,25 @@ export function ColaboradorSheet({
     setEmail(colaboradorParaEditar?.email ?? "");
     setWhatsapp(colaboradorParaEditar?.whatsapp ?? "");
     setDataNascimento(colaboradorParaEditar?.dataNascimento ?? "");
+    setAvatarUrl(colaboradorParaEditar?.avatarUrl ?? "");
+  }
+
+  async function enviarFoto(arquivo: File) {
+    setEnviandoFoto(true);
+    const supabase = createClient();
+    const extensao = arquivo.name.split(".").pop() ?? "jpg";
+    const caminho = `${colaboradorParaEditar?.id ?? "novo"}/${Date.now()}.${extensao}`;
+    const { error } = await supabase.storage
+      .from("avatars")
+      .upload(caminho, arquivo, { upsert: true });
+    if (error) {
+      console.error("Falha ao enviar foto:", error.message);
+      setEnviandoFoto(false);
+      return;
+    }
+    const { data } = supabase.storage.from("avatars").getPublicUrl(caminho);
+    setAvatarUrl(data.publicUrl);
+    setEnviandoFoto(false);
   }
 
   function salvar() {
@@ -88,7 +124,7 @@ export function ColaboradorSheet({
       status,
       squadId,
       avatarIniciais: iniciaisDoNome(nome),
-      avatarUrl: colaboradorParaEditar?.avatarUrl,
+      avatarUrl: avatarUrl || undefined,
     };
     if (editando) {
       onEditar?.(dados);
@@ -129,6 +165,52 @@ export function ColaboradorSheet({
         </DialogHeader>
 
         <div className="flex flex-col gap-4 px-5 pb-5">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => inputFotoRef.current?.click()}
+              disabled={enviandoFoto}
+              className="group/avatar-btn relative shrink-0 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+              aria-label="Trocar foto"
+            >
+              <Avatar className="size-14">
+                {avatarUrl && <AvatarImage src={avatarUrl} alt="" />}
+                <AvatarFallback className="text-sm">
+                  {nome ? iniciaisDoNome(nome) : "?"}
+                </AvatarFallback>
+              </Avatar>
+              <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity group-hover/avatar-btn:opacity-100">
+                {enviandoFoto ? (
+                  <Loader2 className="size-4 animate-spin text-white" />
+                ) : (
+                  <Camera className="size-4 text-white" />
+                )}
+              </span>
+              <input
+                ref={inputFotoRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                onChange={(e) => {
+                  const arquivo = e.target.files?.[0];
+                  if (arquivo) enviarFoto(arquivo);
+                  e.target.value = "";
+                }}
+              />
+            </button>
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-medium">Foto de perfil</p>
+              <button
+                type="button"
+                onClick={() => inputFotoRef.current?.click()}
+                disabled={enviandoFoto}
+                className="w-fit text-xs text-muted-foreground hover:text-primary hover:underline"
+              >
+                {avatarUrl ? "Trocar foto" : "Adicionar foto"}
+              </button>
+            </div>
+          </div>
+
           <div className="flex flex-col gap-2">
             <Label htmlFor="colab-nome">Nome completo</Label>
             <Input
@@ -142,13 +224,22 @@ export function ColaboradorSheet({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="colab-cargo">Cargo</Label>
-              <Input
-                id="colab-cargo"
-                value={cargo}
-                onChange={(e) => setCargo(e.target.value)}
-                placeholder="Ex.: Social Media"
-              />
+              <Label>Cargo</Label>
+              <Select value={cargo} onValueChange={(v) => v && setCargo(v)}>
+                <SelectTrigger className="h-9 w-full">
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CARGOS_OPCOES.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
+                  ))}
+                  {cargo && !(CARGOS_OPCOES as readonly string[]).includes(cargo) && (
+                    <SelectItem value={cargo}>{cargo}</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex flex-col gap-2">
               <Label>Squad</Label>
@@ -250,7 +341,7 @@ export function ColaboradorSheet({
           ) : (
             <span />
           )}
-          <Button onClick={salvar} disabled={!nome.trim() || !squadId}>
+          <Button onClick={salvar} disabled={!nome.trim() || !squadId || enviandoFoto}>
             {editando ? "Salvar alterações" : "Cadastrar membro"}
           </Button>
         </DialogFooter>

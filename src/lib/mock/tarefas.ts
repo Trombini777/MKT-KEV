@@ -8,7 +8,7 @@ export const TAREFAS: Tarefa[] = [
       "Banner para o site e redes sociais anunciando as condições especiais de seguro de vida no Dia das Mães.",
     tipoId: "banner",
     origem: "Projeto",
-    projetoId: "dia-das-maes",
+    projetoId: "70000000-0000-0000-0000-000000000001",
     quantidadeUnidade: 3,
     prioridadeFinal: "Crítica",
     faseAtualId: "em-execucao",
@@ -51,7 +51,7 @@ export const TAREFAS: Tarefa[] = [
     descricao: "E-mail para a base de clientes com apólice vencendo nos próximos 30 dias.",
     tipoId: "email-marketing",
     origem: "Projeto",
-    projetoId: "renovacao-apolice",
+    projetoId: "70000000-0000-0000-0000-000000000003",
     prioridadeFinal: "Alta",
     faseAtualId: "em-execucao",
     dataInicio: "2026-08-06",
@@ -71,7 +71,7 @@ export const TAREFAS: Tarefa[] = [
     descricao: "Card educativo sobre prazos e documentos necessários para o IPVA 2026.",
     tipoId: "post-social",
     origem: "Projeto",
-    projetoId: "ipva",
+    projetoId: "70000000-0000-0000-0000-000000000002",
     quantidadeUnidade: 1,
     prioridadeFinal: "Normal",
     faseAtualId: "em-execucao",
@@ -164,7 +164,7 @@ export const TAREFAS: Tarefa[] = [
     descricao: "Kit completo de peças da campanha de IPVA para todos os canais.",
     tipoId: "material-campanha",
     origem: "Projeto",
-    projetoId: "ipva",
+    projetoId: "70000000-0000-0000-0000-000000000002",
     quantidadeUnidade: 6,
     prioridadeFinal: "Alta",
     faseAtualId: "aprovacao",
@@ -362,7 +362,7 @@ export const TAREFAS: Tarefa[] = [
     descricao: "Post de teaser anunciando a chegada da campanha de Dia das Mães.",
     tipoId: "post-social",
     origem: "Projeto",
-    projetoId: "dia-das-maes",
+    projetoId: "70000000-0000-0000-0000-000000000001",
     quantidadeUnidade: 1,
     prioridadeFinal: "Normal",
     faseAtualId: "concluido",
@@ -383,7 +383,7 @@ export const TAREFAS: Tarefa[] = [
     descricao: "Comunicado avisando o time interno sobre o início da campanha de IPVA.",
     tipoId: "comunicado-interno",
     origem: "Projeto",
-    projetoId: "ipva",
+    projetoId: "70000000-0000-0000-0000-000000000002",
     prioridadeFinal: "Normal",
     faseAtualId: "concluido",
     dataInicio: "2026-07-10",
@@ -403,7 +403,7 @@ export const TAREFAS: Tarefa[] = [
     descricao: "Banner incentivando renovação antecipada com desconto progressivo.",
     tipoId: "banner",
     origem: "Projeto",
-    projetoId: "renovacao-apolice",
+    projetoId: "70000000-0000-0000-0000-000000000003",
     quantidadeUnidade: 2,
     prioridadeFinal: "Normal",
     faseAtualId: "em-execucao",
@@ -566,8 +566,102 @@ export function tarefasExecutadasPor(colaboradorId: string, tarefas: Tarefa[] = 
   );
 }
 
+/**
+ * Tarefas onde `colaboradorId` é quem deve agir AGORA: a etapa atual do planejamento aplicado,
+ * quando existir (fonte de verdade desde que o motor de planejamento passou a existir), ou —
+ * pra tarefas sem planejamento (triagem, fluxo simples por fase) — o executor da fase atual.
+ * `tarefasExecutadasPor` sozinha fica cega pra qualquer tarefa com planejamento, porque nada
+ * grava `executoresPorFase` nesse fluxo — só `planejamento.etapas[].colaboradorId`.
+ */
+export function tarefasParaExecutarAgora(colaboradorId: string, tarefas: Tarefa[] = TAREFAS): Tarefa[] {
+  return tarefas.filter((t) => {
+    if (t.planejamento) {
+      const atual = t.planejamento.etapas.find((e) => e.ordem === t.planejamento!.etapaAtualOrdem);
+      return atual?.colaboradorId === colaboradorId;
+    }
+    return (t.executoresPorFase[t.faseAtualId] ?? []).includes(colaboradorId);
+  });
+}
+
+/**
+ * Tarefas onde `colaboradorId` está envolvido em qualquer momento — etapa passada, atual ou
+ * futura do planejamento, ou executor de qualquer fase no fluxo legado — não só o que precisa
+ * agir agora. Base pros contadores de "minhas atividades" do Painel de Trabalho, que somam
+ * backlog + em execução + aprovação independente de quem é o executor atual daquela fase.
+ */
+export function minhasTarefas(colaboradorId: string, tarefas: Tarefa[] = TAREFAS): Tarefa[] {
+  return tarefas.filter((t) => {
+    if (t.planejamento) {
+      return t.planejamento.etapas.some((e) => e.colaboradorId === colaboradorId);
+    }
+    return Object.values(t.executoresPorFase).some((ids) => ids.includes(colaboradorId));
+  });
+}
+
+/**
+ * Filtra `tarefas` (já esperado ser algo como `tarefasParaExecutarAgora`, ou seja, a etapa atual
+ * já pertence ao colaborador) pelas que têm alocação no dia `diaIso` — mesma lógica de
+ * `horasAlocadasPorDia` (workload.ts), só que devolvendo as tarefas em vez de somar horas.
+ * Usado pelo clique nos dias do Workload do Painel de Trabalho.
+ */
+export function tarefasComAlocacaoNoDia(tarefas: Tarefa[], diaIso: string): Tarefa[] {
+  return tarefas.filter((t) => {
+    if (t.planejamento) {
+      const atual = t.planejamento.etapas.find((e) => e.ordem === t.planejamento!.etapaAtualOrdem);
+      return atual != null && atual.alocacoes.some((a) => a.data === diaIso);
+    }
+    return t.dataInicio === diaIso;
+  });
+}
+
+export type EtapaFutura = { tarefa: Tarefa; ordem: number; dataFim: string; esforco: number | undefined };
+
+/**
+ * Próxima etapa de `colaboradorId` em cada tarefa cujo planejamento ainda não chegou nela —
+ * ordenado pela data mais próxima primeiro. É o "Entrando em breve" do Painel de Trabalho
+ * (PRD E3): o que está alocado pra essa pessoa mas ainda não é a etapa atual da tarefa.
+ *
+ * Uma tarefa nunca aparece aqui se `colaboradorId` já é o executor da etapa atual dela — nesse
+ * caso ela já está em `tarefasParaExecutarAgora` (a pessoa já pode agir agora), e repetir a
+ * mesma tarefa em "Entrando em breve" (por causa de uma etapa futura, também dela) confundia
+ * mais do que ajudava.
+ */
+export function atividadesEntrandoEmBreve(colaboradorId: string, tarefas: Tarefa[] = TAREFAS): EtapaFutura[] {
+  const resultado: EtapaFutura[] = [];
+  for (const t of tarefas) {
+    if (!t.planejamento) continue;
+    const atual = t.planejamento.etapas.find((e) => e.ordem === t.planejamento!.etapaAtualOrdem);
+    if (atual?.colaboradorId === colaboradorId) continue;
+    const futuras = t.planejamento.etapas
+      .filter((e) => e.ordem > t.planejamento!.etapaAtualOrdem && e.colaboradorId === colaboradorId)
+      .sort((a, b) => a.ordem - b.ordem);
+    if (futuras.length > 0) {
+      const proxima = futuras[0];
+      const esforco =
+        proxima.alocacoes.length > 0
+          ? proxima.alocacoes.reduce((soma, a) => soma + a.horas, 0)
+          : undefined;
+      resultado.push({ tarefa: t, ordem: proxima.ordem, dataFim: proxima.dataFim, esforco });
+    }
+  }
+  return resultado.sort((a, b) => a.dataFim.localeCompare(b.dataFim));
+}
+
 export function tarefasDoProjeto(projetoId: string): Tarefa[] {
   return TAREFAS.filter((t) => t.projetoId === projetoId);
+}
+
+/** Esforço total estimado de uma tarefa (soma de todas as etapas, não só a atual) — usado pra
+ * somar "horas estimadas" de um projeto inteiro. Planejamento aplicado é a fonte de verdade
+ * (soma as alocações de todas as etapas); tarefas sem planejamento caem pro campo legado. */
+export function horasEstimadasTarefa(tarefa: Tarefa): number {
+  if (tarefa.planejamento) {
+    return tarefa.planejamento.etapas.reduce(
+      (soma, etapa) => soma + etapa.alocacoes.reduce((s, a) => s + a.horas, 0),
+      0
+    );
+  }
+  return Object.values(tarefa.estimativaPorFase).reduce((soma, h) => soma + (h ?? 0), 0);
 }
 
 export function progressoProjeto(projetoId: string): number {

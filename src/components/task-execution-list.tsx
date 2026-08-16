@@ -4,12 +4,14 @@ import type { ReactNode } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { AlertCircle, CirclePlay } from "lucide-react";
 import { PriorityBadge } from "@/components/priority-badge";
+import { StatusProjetoBadge } from "@/components/status-projeto-badge";
 import { TaskLink } from "@/components/task-link";
 import { cn } from "@/lib/utils";
 import { isoHoje, diasEntre } from "@/lib/hoje";
+import { useProjetos } from "@/lib/projeto-store";
 import {
   estaEmRisco,
-  etapaTarefaAtual,
+  infoEtapaAtual,
   nomeColaborador,
   projetoById,
   type Tarefa,
@@ -44,19 +46,19 @@ function buDaTarefa(tarefa: Tarefa): string {
 }
 
 function projetoDaTarefa(tarefa: Tarefa): string {
-  if (tarefa.origem !== "Projeto" || !tarefa.projetoId) return "—";
+  if (!tarefa.projetoId) return "—";
   const projeto = projetoById(tarefa.projetoId);
   return projeto?.tipo === "Projeto" ? projeto.nome : "—";
 }
 
 function campanhaDaTarefa(tarefa: Tarefa): string {
-  if (tarefa.origem !== "Projeto" || !tarefa.projetoId) return "—";
+  if (!tarefa.projetoId) return "—";
   const projeto = projetoById(tarefa.projetoId);
   return projeto?.tipo === "Campanha" ? projeto.nome : "—";
 }
 
 function bucketDoPrazo(iso?: string): { chave: string; nome: string; ordem: number } {
-  if (!iso) return { chave: "sem-prazo", nome: "Sem prazo definido", ordem: 2 };
+  if (!iso) return { chave: "sem-prazo", nome: "Suas atividades", ordem: 2 };
   const dias = diasEntre(isoHoje(), iso);
   if (dias <= 0) return { chave: "hoje", nome: "Hoje", ordem: 0 };
   return { chave: "proximos", nome: "Próximos dias", ordem: 1 };
@@ -91,15 +93,19 @@ function TagCampo({ label, className }: { label: string; className: string }) {
 }
 
 function TaskCard({ tarefa }: { tarefa: Tarefa }) {
+  // Assina o hook (mesmo sem usar o valor) só pra re-renderizar quando PROJETOS hidratar do
+  // Supabase — `projetoDaTarefa`/`campanhaDaTarefa`/`projetosAtivos` leem o array em memória.
+  useProjetos();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const emRisco = estaEmRisco(tarefa);
-  const situacaoExecucao = situacaoEtapa(tarefa.execucaoEtapaAte);
+  const etapa = infoEtapaAtual(tarefa);
+  const situacaoExecucao = situacaoEtapa(etapa.dataFim);
   const situacaoConclusao = situacaoPrazo(tarefa.prazo);
-  const etapa = etapaTarefaAtual(tarefa);
-  const executorId = (tarefa.executoresPorFase[tarefa.faseAtualId] ?? [])[0];
-  const esforco = tarefa.estimativaPorFase[tarefa.faseAtualId];
+  const executorId = etapa.executorId;
+  const esforco = etapa.esforco;
+  const projetoVinculado = tarefa.projetoId ? projetoById(tarefa.projetoId) : undefined;
 
   function abrirTarefa() {
     const params = new URLSearchParams(searchParams.toString());
@@ -130,6 +136,17 @@ function TaskCard({ tarefa }: { tarefa: Tarefa }) {
           <TaskLink taskId={tarefa.id} className="truncate text-lg font-semibold hover:underline">
             {tarefa.titulo}
           </TaskLink>
+          {projetoVinculado && (
+            <>
+              <span
+                className="shrink-0 truncate rounded-full bg-muted px-2 py-0.5 text-[0.7rem] font-medium text-muted-foreground"
+                title={`Vinculada ao ${projetoVinculado.tipo.toLowerCase()} "${projetoVinculado.nome}"`}
+              >
+                {projetoVinculado.nome}
+              </span>
+              <StatusProjetoBadge status={projetoVinculado.status} />
+            </>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <span className="text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase">
@@ -141,7 +158,7 @@ function TaskCard({ tarefa }: { tarefa: Tarefa }) {
 
       <div className={cn("border-t border-border/60 pt-4", COLUNAS_CARD)}>
         <CampoTarefa label="Etapa">
-          <TagCampo label={etapa?.nome ?? "—"} className="bg-secondary text-secondary-foreground" />
+          <TagCampo label={etapa.nome ?? "—"} className="bg-secondary text-secondary-foreground" />
         </CampoTarefa>
         <CampoTarefa label="Executor">
           <TagCampo label={nomeColaborador(executorId)} className="bg-secondary text-secondary-foreground" />

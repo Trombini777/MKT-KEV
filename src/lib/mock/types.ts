@@ -134,7 +134,9 @@ export type AlocacaoDia = {
   horas: number;
 };
 
-/** Etapa de um planejamento gerado: quem vai executar e em quais dias. */
+/** Etapa de um planejamento gerado: quem vai executar e em quais dias. Usado tanto pela
+ * recomendação (antes de existir no banco) quanto, estendido, pelo plano já aplicado — ver
+ * `EtapaAgendadaAplicada`. */
 export type EtapaAgendada = {
   etapaId: string;
   /** `ordem` da EtapaDoTipo de origem. */
@@ -143,6 +145,16 @@ export type EtapaAgendada = {
   alocacoes: AlocacaoDia[];
   /** Última data em `alocacoes` — quando a etapa termina. */
   dataFim: string;
+};
+
+/** `EtapaAgendada` de um planejamento já aplicado (persistido) — ganha o uuid real da linha
+ * `planejamento_etapas` e o registro manual de tempo gasto, que só existem depois que a etapa
+ * vira uma linha de verdade no banco. */
+export type EtapaAgendadaAplicada = EtapaAgendada & {
+  /** uuid da linha `planejamento_etapas` — chave pra registrar tempo gasto nessa etapa. */
+  id: string;
+  /** Total de horas já registradas manualmente nessa etapa (soma de cada lançamento). */
+  tempoGastoHoras: number;
 };
 
 export type StatusPlanejamento = "sem-prazo" | "dentro-do-prazo" | "apertado" | "impossivel";
@@ -160,7 +172,7 @@ export type SugestaoTrocaExecutor = {
 export type PlanejamentoTarefa = {
   /** Data (ISO) em que este planejamento foi gerado/aplicado. */
   geradoEm: string;
-  etapas: EtapaAgendada[];
+  etapas: EtapaAgendadaAplicada[];
   previsaoConclusao: string;
   status: StatusPlanejamento;
   /** Dias entre previsaoConclusao e prazo (prazo − previsão). Negativo = atraso. Undefined = sem prazo. */
@@ -217,6 +229,8 @@ export type Tarefa = {
   planejamento?: PlanejamentoTarefa;
 };
 
+export type StatusProjeto = "Planejado" | "Ativo" | "Concluído" | "Cancelado";
+
 export type Projeto = {
   id: string;
   nome: string;
@@ -228,6 +242,7 @@ export type Projeto = {
   dataInicio: string;
   dataFim: string;
   notasEncerramento?: string;
+  status: StatusProjeto;
 };
 
 export type ExecutorPadrao = Record<string, string>; // `${tipoId}:${faseId}` -> colaboradorId

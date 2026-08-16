@@ -6,6 +6,8 @@ import {
   etapaById,
   type Tarefa,
   type PlanejamentoTarefa,
+  type EtapaAgendada,
+  type EtapaAgendadaAplicada,
   type CategoriaEtapa,
   type ChecklistItem,
   type Comentario,
@@ -15,6 +17,7 @@ import { proximoDia, proximoDiaUtil } from "@/lib/scheduling";
 import { isoHoje, diasEntre } from "@/lib/hoje";
 import { createClient } from "@/lib/supabase/client";
 import { obterColaboradorAtual } from "@/lib/current-colaborador-client";
+import { obterConfiguracoesFluxo } from "@/lib/configuracoes-fluxo";
 
 type SupabaseClient = ReturnType<typeof createClient>;
 
@@ -38,7 +41,8 @@ const SELECT = `
   comentarios(id, autor_id, texto, criado_em),
   historico_eventos(id, data, autor_id, descricao, fase_id, acao),
   planejamentos(gerado_em, previsao_conclusao, status, folga_dias, etapa_atual_ordem,
-    planejamento_etapas(etapa_id, ordem, colaborador_id, data_fim,
+    planejamento_etapas(id, etapa_id, ordem, colaborador_id, data_fim,
+      tempo_gasto_horas,
       planejamento_alocacoes(data, horas)))
 `;
 
@@ -111,10 +115,12 @@ function linhaParaTarefa(row: any): Tarefa {
             .sort((a: any, b: any) => a.ordem - b.ordem)
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .map((e: any) => ({
+              id: e.id,
               etapaId: e.etapa_id,
               ordem: e.ordem,
               colaboradorId: e.colaborador_id,
               dataFim: e.data_fim,
+              tempoGastoHoras: e.tempo_gasto_horas ?? 0,
               alocacoes: (e.planejamento_alocacoes ?? [])
                 .slice()
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -129,38 +135,6 @@ function linhaParaTarefa(row: any): Tarefa {
         }
       : undefined,
   };
-}
-
-function paraColunas(t: Partial<Tarefa>): Record<string, unknown> {
-  const linha: Record<string, unknown> = {};
-  if (t.titulo !== undefined) linha.titulo = t.titulo;
-  if (t.descricao !== undefined) linha.descricao = t.descricao;
-  if (t.tipoId !== undefined) linha.tipo_id = t.tipoId || null;
-  if (t.origem !== undefined) linha.origem = t.origem;
-  if (t.solicitanteNome !== undefined) linha.solicitante_nome = t.solicitanteNome || null;
-  if (t.solicitanteEmail !== undefined) linha.solicitante_email = t.solicitanteEmail || null;
-  if (t.anexos !== undefined) linha.anexos = t.anexos;
-  if (t.links !== undefined) linha.links = t.links;
-  if (t.justificativaPrioridade !== undefined)
-    linha.justificativa_prioridade = t.justificativaPrioridade || null;
-  if (t.justificativaPrazo !== undefined) linha.justificativa_prazo = t.justificativaPrazo || null;
-  if (t.observacoes !== undefined) linha.observacoes = t.observacoes || null;
-  if (t.quantidadeUnidade !== undefined) linha.quantidade_unidade = t.quantidadeUnidade ?? null;
-  if (t.dadosCompletos !== undefined) linha.dados_completos = t.dadosCompletos || null;
-  if (t.tipoSolicitacaoGeral !== undefined) linha.tipo_solicitacao_geral = t.tipoSolicitacaoGeral || null;
-  if (t.departamento !== undefined) linha.departamento = t.departamento || null;
-  if (t.projetoId !== undefined) linha.projeto_id = t.projetoId || null;
-  if (t.prioridadeSugerida !== undefined) linha.prioridade_sugerida = t.prioridadeSugerida || null;
-  if (t.prioridadeFinal !== undefined) linha.prioridade_final = t.prioridadeFinal;
-  if (t.faseAtualId !== undefined) linha.fase_atual_id = t.faseAtualId;
-  if (t.dataInicio !== undefined) linha.data_inicio = t.dataInicio;
-  if (t.prazo !== undefined) linha.prazo = t.prazo || null;
-  if (t.previsaoConclusao !== undefined) linha.previsao_conclusao = t.previsaoConclusao || null;
-  if (t.executoresPorFase !== undefined) linha.executores_por_fase = t.executoresPorFase;
-  if (t.estimativaPorFase !== undefined) linha.estimativa_por_fase = t.estimativaPorFase;
-  if (t.participantesIds !== undefined) linha.participantes_ids = t.participantesIds;
-  if (t.tagIds !== undefined) linha.tag_ids = t.tagIds;
-  return linha;
 }
 
 async function inserirHistorico(
@@ -233,9 +207,12 @@ async function sincronizarInicioDeTarefas() {
   emit();
 }
 
-async function hidratar() {
-  if (hidratado) return;
-  hidratado = true;
+/**
+ * Refaz a busca completa e substitui `tasks` — usado depois de uma escrita que não passa pelos
+ * mutators daqui (ex.: a RPC `criar_solicitacao_publica`, chamada direto pelo dialog de nova
+ * atividade), pra essa mudança aparecer na tela sem precisar recarregar a página.
+ */
+export async function recarregarTarefas() {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("tarefas")
@@ -247,6 +224,12 @@ async function hidratar() {
   }
   tasks = (data ?? []).map(linhaParaTarefa);
   emit();
+}
+
+async function hidratar() {
+  if (hidratado) return;
+  hidratado = true;
+  await recarregarTarefas();
   await sincronizarInicioDeTarefas();
 }
 
@@ -271,28 +254,6 @@ export function obterTarefas(): Tarefa[] {
   return tasks;
 }
 
-/**
- * Cria uma tarefa nova (fluxo interno, autenticado — não confundir com o formulário público de
- * Solicitação, que usa a RPC `criar_solicitacao_publica` direto). `dados.id` é ignorado — o
- * Postgres gera o uuid real.
- */
-export async function addTask(
-  dados: Partial<Tarefa> &
-    Pick<Tarefa, "titulo" | "descricao" | "origem" | "prioridadeFinal" | "faseAtualId" | "dataInicio">
-) {
-  const supabase = createClient();
-  const { data, error } = await supabase.from("tarefas").insert(paraColunas(dados)).select(SELECT).single();
-  if (error || !data) {
-    console.error("Falha ao criar tarefa:", error?.message);
-    return;
-  }
-  const nova = linhaParaTarefa(data);
-  const hist = await inserirHistorico(supabase, nova.id, "Tarefa criada", { faseId: nova.faseAtualId });
-  nova.historico = [hist];
-  tasks = [nova, ...tasks];
-  emit();
-}
-
 /** Registra a decisão de aprovação interna da solicitação; aprovar já move a tarefa para Triagem. */
 export async function registrarAprovacaoInterna(taskId: string, aprovada: boolean) {
   const t = tasks.find((x) => x.id === taskId);
@@ -315,7 +276,20 @@ export async function registrarAprovacaoInterna(taskId: string, aprovada: boolea
   }
 
   const novaFaseId = "triagem";
-  const { error } = await supabase.from("tarefas").update({ fase_atual_id: novaFaseId }).eq("id", taskId);
+  // Sem responsável padrão configurado (ver /etapas), a tarefa entra na Triagem sem dono — do
+  // jeito que já era antes dessa checagem existir.
+  let novoExecutoresPorFase = t.executoresPorFase;
+  if (!(t.executoresPorFase.triagem ?? []).length) {
+    const { config } = await obterConfiguracoesFluxo();
+    if (config.responsavelPadraoTriagemId) {
+      novoExecutoresPorFase = { ...t.executoresPorFase, triagem: [config.responsavelPadraoTriagemId] };
+    }
+  }
+
+  const { error } = await supabase
+    .from("tarefas")
+    .update({ fase_atual_id: novaFaseId, executores_por_fase: novoExecutoresPorFase })
+    .eq("id", taskId);
   if (error) {
     console.error("Falha ao mover para triagem:", error.message);
     return;
@@ -325,7 +299,12 @@ export async function registrarAprovacaoInterna(taskId: string, aprovada: boolea
   });
   tasks = tasks.map((x) =>
     x.id === taskId
-      ? { ...x, faseAtualId: novaFaseId, historico: [...x.historico, histDecisao, histMove] }
+      ? {
+          ...x,
+          faseAtualId: novaFaseId,
+          executoresPorFase: novoExecutoresPorFase,
+          historico: [...x.historico, histDecisao, histMove],
+        }
       : x
   );
   emit();
@@ -378,10 +357,66 @@ export async function atribuirResponsavelEtapa(taskId: string, faseId: string, c
   emit();
 }
 
+/** Troca quem executa uma etapa específica do planejamento aplicado (não precisa ser a etapa atual). */
+export async function reatribuirExecutorEtapa(taskId: string, ordem: number, novoColaboradorId: string) {
+  const t = tasks.find((x) => x.id === taskId);
+  if (!t || !t.planejamento) return;
+  const etapaAlvo = t.planejamento.etapas.find((e) => e.ordem === ordem);
+  if (!etapaAlvo || etapaAlvo.colaboradorId === novoColaboradorId) return;
+
+  const supabase = createClient();
+  const { data: planRow, error: planErro } = await supabase
+    .from("planejamentos")
+    .select("id")
+    .eq("tarefa_id", taskId)
+    .single();
+  if (planErro || !planRow) {
+    console.error("Falha ao localizar planejamento pra reatribuir executor:", planErro?.message);
+    return;
+  }
+
+  const { error } = await supabase
+    .from("planejamento_etapas")
+    .update({ colaborador_id: novoColaboradorId })
+    .eq("planejamento_id", planRow.id)
+    .eq("ordem", ordem);
+  if (error) {
+    console.error("Falha ao reatribuir executor da etapa:", error.message);
+    return;
+  }
+
+  const autor = await obterColaboradorAtual();
+  const nomeEtapa = etapaById(etapaAlvo.etapaId)?.nome ?? etapaAlvo.etapaId;
+  const hist = await inserirHistorico(
+    supabase,
+    taskId,
+    `${autor?.nome ?? "Alguém"} reatribuiu a etapa "${nomeEtapa}" para outro executor`,
+    { faseId: t.faseAtualId }
+  );
+
+  tasks = tasks.map((x) =>
+    x.id === taskId
+      ? {
+          ...x,
+          planejamento: {
+            ...x.planejamento!,
+            etapas: x.planejamento!.etapas.map((e) =>
+              e.ordem === ordem ? { ...e, colaboradorId: novoColaboradorId } : e
+            ),
+          },
+          historico: [...x.historico, hist],
+        }
+      : x
+  );
+  emit();
+}
+
 /** Aplica o planejamento recomendado pelo motor de regras, gerado a partir do Tipo de Tarefa da triagem. */
 export async function aplicarPlanejamento(
   taskId: string,
-  resultado: Omit<PlanejamentoTarefa, "geradoEm" | "etapaAtualOrdem">,
+  resultado: Omit<PlanejamentoTarefa, "geradoEm" | "etapaAtualOrdem" | "etapas"> & {
+    etapas: EtapaAgendada[];
+  },
   dataInicio?: string
 ) {
   const t = tasks.find((x) => x.id === taskId);
@@ -404,6 +439,7 @@ export async function aplicarPlanejamento(
     return;
   }
 
+  const etapasAplicadas: EtapaAgendadaAplicada[] = [];
   for (const etapa of resultado.etapas) {
     const { data: etapaRow, error: etapaErro } = await supabase
       .from("planejamento_etapas")
@@ -425,6 +461,11 @@ export async function aplicarPlanejamento(
         .from("planejamento_alocacoes")
         .insert(etapa.alocacoes.map((a) => ({ planejamento_etapa_id: etapaRow.id, data: a.data, horas: a.horas })));
     }
+    etapasAplicadas.push({
+      ...etapa,
+      id: etapaRow.id,
+      tempoGastoHoras: 0,
+    });
   }
 
   const colunas: Record<string, unknown> = { previsao_conclusao: resultado.previsaoConclusao };
@@ -442,7 +483,7 @@ export async function aplicarPlanejamento(
   const planejamento: PlanejamentoTarefa = {
     geradoEm: planRow.gerado_em,
     etapaAtualOrdem: 1,
-    etapas: resultado.etapas,
+    etapas: etapasAplicadas,
     previsaoConclusao: resultado.previsaoConclusao,
     status: resultado.status,
     folgaDias: resultado.folgaDias,
@@ -534,6 +575,159 @@ export async function avancarEtapaPlanejamento(taskId: string) {
         }
       : x
   );
+  emit();
+}
+
+/**
+ * Registra no histórico que alguém deu o "check" de pronto na etapa atual do planejamento —
+ * é só um sinal/registro; quem efetivamente avança a etapa pro próximo executor continua sendo
+ * `avancarEtapaPlanejamento` (botão "Mover etapa").
+ */
+export async function marcarEtapaChecada(taskId: string, ordem: number) {
+  const t = tasks.find((x) => x.id === taskId);
+  if (!t || !t.planejamento) return;
+  const etapa = t.planejamento.etapas.find((e) => e.ordem === ordem);
+  if (!etapa) return;
+  const nomeEtapa = etapaById(etapa.etapaId)?.nome ?? etapa.etapaId;
+
+  const supabase = createClient();
+  const autor = await obterColaboradorAtual();
+  const hist = await inserirHistorico(
+    supabase,
+    taskId,
+    `${autor?.nome ?? "Alguém"} deu o check na etapa "${nomeEtapa}" como pronta`,
+    { faseId: t.faseAtualId }
+  );
+  tasks = tasks.map((x) => (x.id === taskId ? { ...x, historico: [...x.historico, hist] } : x));
+  emit();
+}
+
+function atualizarEtapaAplicada(
+  taskId: string,
+  planejamentoEtapaId: string,
+  patch: Partial<EtapaAgendadaAplicada>
+) {
+  tasks = tasks.map((x) =>
+    x.id === taskId && x.planejamento
+      ? {
+          ...x,
+          planejamento: {
+            ...x.planejamento,
+            etapas: x.planejamento.etapas.map((e) =>
+              e.id === planejamentoEtapaId ? { ...e, ...patch } : e
+            ),
+          },
+        }
+      : x
+  );
+  emit();
+}
+
+/** Registra manualmente horas gastas numa etapa — soma ao total já registrado (não substitui).
+ * `planejamentoEtapaId` é o uuid da linha `planejamento_etapas` (`etapa.id`), não o id do
+ * catálogo de etapas. */
+export async function adicionarTempoEtapa(
+  taskId: string,
+  planejamentoEtapaId: string,
+  horasAdicionais: number
+) {
+  if (!(horasAdicionais > 0)) return;
+  const t = tasks.find((x) => x.id === taskId);
+  const etapa = t?.planejamento?.etapas.find((e) => e.id === planejamentoEtapaId);
+  if (!etapa) return;
+
+  const novoTotal = etapa.tempoGastoHoras + horasAdicionais;
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("planejamento_etapas")
+    .update({ tempo_gasto_horas: novoTotal })
+    .eq("id", planejamentoEtapaId);
+  if (error) {
+    console.error("Falha ao registrar tempo gasto:", error.message);
+    return;
+  }
+  atualizarEtapaAplicada(taskId, planejamentoEtapaId, { tempoGastoHoras: novoTotal });
+}
+
+/**
+ * Início manual da execução direto do card, sem esperar a data de início automática (ver
+ * `sincronizarInicioDeTarefas`) — usado pelo botão "Iniciar atividade" enquanto a tarefa está
+ * no Backlog.
+ */
+export async function iniciarAtividade(taskId: string) {
+  const t = tasks.find((x) => x.id === taskId);
+  if (!t || t.faseAtualId !== "backlog") return;
+  const novaFaseId = "em-execucao";
+
+  const supabase = createClient();
+  const { error } = await supabase.from("tarefas").update({ fase_atual_id: novaFaseId }).eq("id", taskId);
+  if (error) {
+    console.error("Falha ao iniciar atividade:", error.message);
+    return;
+  }
+
+  const autor = await obterColaboradorAtual();
+  const hist = await inserirHistorico(
+    supabase,
+    taskId,
+    `${autor?.nome ?? "Alguém"} iniciou a atividade — movida para ${faseById(novaFaseId)?.nome ?? novaFaseId}`,
+    { faseId: novaFaseId }
+  );
+
+  tasks = tasks.map((x) =>
+    x.id === taskId ? { ...x, faseAtualId: novaFaseId, historico: [...x.historico, hist] } : x
+  );
+  emit();
+}
+
+/** Renomeia a tarefa e registra no histórico. */
+export async function atualizarTitulo(taskId: string, novoTitulo: string) {
+  const limpo = novoTitulo.trim();
+  if (!limpo) return;
+  const t = tasks.find((x) => x.id === taskId);
+  if (!t || limpo === t.titulo) return;
+  const tituloAntigo = t.titulo;
+
+  const supabase = createClient();
+  const { error } = await supabase.from("tarefas").update({ titulo: limpo }).eq("id", taskId);
+  if (error) {
+    console.error("Falha ao renomear atividade:", error.message);
+    return;
+  }
+
+  const autor = await obterColaboradorAtual();
+  const hist = await inserirHistorico(
+    supabase,
+    taskId,
+    `${autor?.nome ?? "Alguém"} renomeou a atividade de "${tituloAntigo}" para "${limpo}"`,
+    { faseId: t.faseAtualId }
+  );
+
+  tasks = tasks.map((x) => (x.id === taskId ? { ...x, titulo: limpo, historico: [...x.historico, hist] } : x));
+  emit();
+}
+
+/** Vincula a tarefa a um projeto/campanha existente (ex.: solicitação avulsa que passa a fazer parte de uma campanha) e registra no histórico. */
+export async function vincularProjeto(taskId: string, projetoId: string, nomeProjeto: string) {
+  const t = tasks.find((x) => x.id === taskId);
+  if (!t || t.projetoId === projetoId) return;
+
+  const supabase = createClient();
+  const { error } = await supabase.from("tarefas").update({ projeto_id: projetoId }).eq("id", taskId);
+  if (error) {
+    console.error("Falha ao vincular projeto:", error.message);
+    return;
+  }
+
+  const autor = await obterColaboradorAtual();
+  const hist = await inserirHistorico(
+    supabase,
+    taskId,
+    `${autor?.nome ?? "Alguém"} vinculou a atividade ao projeto "${nomeProjeto}"`,
+    { faseId: t.faseAtualId }
+  );
+
+  tasks = tasks.map((x) => (x.id === taskId ? { ...x, projetoId, historico: [...x.historico, hist] } : x));
   emit();
 }
 

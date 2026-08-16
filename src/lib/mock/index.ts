@@ -46,6 +46,44 @@ export function etapaTarefaAtual(tarefa: Tarefa): (EtapaTarefa & { ordem: number
   return { ...etapa, ordem };
 }
 
+/**
+ * Etapa/executor/data "atual" pra exibição — prioriza o planejamento aplicado (fonte de verdade
+ * hoje) e cai pros campos antigos (`etapaAtualId`/`execucaoEtapaAte`) só pra tarefas sem
+ * planejamento, que nunca chegam a ganhar esses campos preenchidos. Compartilhado entre qualquer
+ * lugar que mostre "etapa atual" de uma tarefa (Kanban, Lista de atividades etc.) — sem essa
+ * checagem, cards de tarefas com planejamento aplicado ficam sem executor/etapa (campos legados
+ * simplesmente nunca são escritos nesse fluxo).
+ */
+export function infoEtapaAtual(tarefa: Tarefa): {
+  nome: string | undefined;
+  executorId: string | undefined;
+  dataFim: string | undefined;
+  esforco: number | undefined;
+} {
+  if (tarefa.planejamento) {
+    const atual = tarefa.planejamento.etapas.find(
+      (e) => e.ordem === tarefa.planejamento!.etapaAtualOrdem
+    );
+    if (atual) {
+      return {
+        nome: ETAPAS.find((e) => e.id === atual.etapaId)?.nome,
+        executorId: atual.colaboradorId,
+        dataFim: atual.dataFim,
+        esforco:
+          atual.alocacoes.length > 0
+            ? atual.alocacoes.reduce((soma, a) => soma + a.horas, 0)
+            : undefined,
+      };
+    }
+  }
+  return {
+    nome: etapaTarefaAtual(tarefa)?.nome,
+    executorId: (tarefa.executoresPorFase[tarefa.faseAtualId] ?? [])[0],
+    dataFim: tarefa.execucaoEtapaAte,
+    esforco: tarefa.estimativaPorFase[tarefa.faseAtualId],
+  };
+}
+
 export function nomeTag(id: string): string {
   return TAGS.find((t) => t.id === id)?.nome ?? id;
 }

@@ -1,9 +1,12 @@
 import type { Colaborador, Squad } from "./types";
 
+// Ids batem com os uuids reais da tabela `squads` no Supabase (mesmo ajuste feito em
+// mock/projetos.ts — eram ids-slug que não existiam no banco, então qualquer FK contra esse id
+// (ex.: cadastrar um colaborador com squad) falhava com "invalid input syntax for type uuid").
 export const SQUADS: Squad[] = [
-  { id: "conteudo", nome: "Squad Conteúdo" },
-  { id: "midia-paga", nome: "Squad Mídia Paga" },
-  { id: "design", nome: "Squad Design" },
+  { id: "10000000-0000-0000-0000-000000000001", nome: "Squad Conteúdo" },
+  { id: "10000000-0000-0000-0000-000000000002", nome: "Squad Mídia Paga" },
+  { id: "10000000-0000-0000-0000-000000000003", nome: "Squad Design" },
 ];
 
 export const COLABORADORES: Colaborador[] = [
@@ -15,7 +18,7 @@ export const COLABORADORES: Colaborador[] = [
     skills: ["Planejamento", "Gestão de time", "Triagem"],
     capacidadeHorasSemana: 20,
     status: "Ativo",
-    squadId: "conteudo",
+    squadId: "10000000-0000-0000-0000-000000000001",
     avatarIniciais: "BA",
   },
   {
@@ -26,7 +29,7 @@ export const COLABORADORES: Colaborador[] = [
     skills: ["Banner", "Peças gráficas", "Identidade visual"],
     capacidadeHorasSemana: 40,
     status: "Ativo",
-    squadId: "design",
+    squadId: "10000000-0000-0000-0000-000000000003",
     avatarIniciais: "ET",
     avatarUrl: "/avatars/eliezer-trombini.jpg",
   },
@@ -38,7 +41,7 @@ export const COLABORADORES: Colaborador[] = [
     skills: ["Vídeo", "Motion", "Edição"],
     capacidadeHorasSemana: 40,
     status: "Ativo",
-    squadId: "design",
+    squadId: "10000000-0000-0000-0000-000000000003",
     avatarIniciais: "RL",
   },
   {
@@ -49,7 +52,7 @@ export const COLABORADORES: Colaborador[] = [
     skills: ["Redes sociais", "Copy curta", "Reels"],
     capacidadeHorasSemana: 40,
     status: "Ativo",
-    squadId: "conteudo",
+    squadId: "10000000-0000-0000-0000-000000000001",
     avatarIniciais: "CS",
   },
   {
@@ -60,7 +63,7 @@ export const COLABORADORES: Colaborador[] = [
     skills: ["Copywriting", "E-mail marketing", "Roteiro"],
     capacidadeHorasSemana: 40,
     status: "Ativo",
-    squadId: "conteudo",
+    squadId: "10000000-0000-0000-0000-000000000001",
     avatarIniciais: "DS",
   },
   {
@@ -71,7 +74,7 @@ export const COLABORADORES: Colaborador[] = [
     skills: ["Tráfego pago", "Analytics", "Landing pages"],
     capacidadeHorasSemana: 40,
     status: "Em Licença",
-    squadId: "midia-paga",
+    squadId: "10000000-0000-0000-0000-000000000002",
     avatarIniciais: "JC",
   },
 ];

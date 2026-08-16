@@ -23,6 +23,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useTasks, aplicarPlanejamento, atualizarPrazoTarefa, moveTask } from "@/lib/task-store";
+import { anoDoPrazoValido, MENSAGEM_ANO_INVALIDO } from "@/lib/validacao-data";
 import {
   calcularPlanejamentoSimples,
   classificarStatus,
@@ -144,7 +145,7 @@ export function PlanejamentoRecomendado({ tarefa }: { tarefa: Tarefa }) {
     : dataInicio;
 
   function confirmarDataDesejada() {
-    if (!dataDesejadaInput) return;
+    if (!dataDesejadaInput || !anoDoPrazoValido(dataDesejadaInput)) return;
     atualizarPrazoTarefa(tarefa.id, dataDesejadaInput);
     setEditandoDataDesejada(false);
   }
@@ -235,8 +236,14 @@ export function PlanejamentoRecomendado({ tarefa }: { tarefa: Tarefa }) {
               />
               <button
                 type="button"
+                disabled={!dataDesejadaInput || !anoDoPrazoValido(dataDesejadaInput)}
+                title={
+                  dataDesejadaInput && !anoDoPrazoValido(dataDesejadaInput)
+                    ? MENSAGEM_ANO_INVALIDO
+                    : "Salvar prazo"
+                }
                 onClick={confirmarDataDesejada}
-                className="shrink-0 text-success"
+                className="shrink-0 text-success disabled:cursor-not-allowed disabled:text-muted-foreground/40"
                 aria-label="Salvar prazo"
               >
                 <Check className="size-3.5" />

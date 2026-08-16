@@ -6,12 +6,15 @@ import { ColaboradorAvatar } from "@/components/colaborador-avatar";
 import { PriorityBadge } from "@/components/priority-badge";
 import { cn } from "@/lib/utils";
 import { isoHoje, diasEntre } from "@/lib/hoje";
+import { useProjetos } from "@/lib/projeto-store";
+import { useConfiguracoesFluxo } from "@/lib/configuracoes-fluxo-store";
 import {
   FASES,
   destinosPermitidos,
-  etapaTarefaAtual,
+  infoEtapaAtual,
   projetoById,
   tipoById,
+  etapaById,
   unidadeMedidaById,
   nomeColaborador,
   nomeTipo,
@@ -32,6 +35,24 @@ function situacaoEtapa(iso?: string): { label: string; className: string } {
   if (dias === 0) return { label: "Hoje", className: "bg-primary text-primary-foreground" };
   if (dias === 1) return { label: "Amanhã", className: "bg-success text-success-foreground" };
   return { label: formatarDataCurta(iso), className: "bg-secondary text-secondary-foreground" };
+}
+
+/**
+ * Prévia da primeira etapa do fluxo do tipo — usada quando a tarefa ainda não tem planejamento
+ * aplicado (Solicitações/Triagem/Backlog), pra a etapa/SLA médio não ficarem em branco no card.
+ */
+function primeiraEtapaTipo(
+  tarefa: Tarefa
+): { nome: string | undefined; slaDias: number | undefined; slaHoras?: undefined } | undefined {
+  const primeira = tipoById(tarefa.tipoId)?.etapas.reduce<
+    { etapaId: string; ordem: number; slaDias?: number } | undefined
+  >((menor, e) => (!menor || e.ordem < menor.ordem ? e : menor), undefined);
+  if (!primeira) return undefined;
+  return { nome: etapaById(primeira.etapaId)?.nome, slaDias: primeira.slaDias };
+}
+
+function formatHoras(horas: number): string {
+  return Number.isInteger(horas) ? `${horas}h` : `${horas.toFixed(1)}h`;
 }
 
 function buDaTarefa(tarefa: Tarefa): string {
@@ -81,6 +102,12 @@ export function KanbanBoard({
   onMoverTarefa: (taskId: string, novaFaseId: string) => void;
 }) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  // Assina o hook (mesmo sem usar o valor) só pra re-renderizar quando PROJETOS hidratar do
+  // Supabase — `buDaTarefa`/`projetoById` são lidos direto do array mutado em memória.
+  useProjetos();
+  // SLA padrão de Aprovação/Triagem configurado em Tipos de Tarefa — usado como fallback do
+  // card enquanto a tarefa não tem etapa própria (ver `slaFallbackHoras` abaixo).
+  const configFluxo = useConfiguracoesFluxo();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -142,10 +169,29 @@ export function KanbanBoard({
 
             <div className="flex flex-col gap-2">
               {tarefasDaFase.map((tarefa) => {
-                const executorId = tarefa.executoresPorFase[tarefa.faseAtualId]?.[0];
+                const etapaAtual = infoEtapaAtual(tarefa);
+                const executorId = etapaAtual.executorId;
                 const emRisco = estaEmRisco(tarefa);
-                const etapa = etapaTarefaAtual(tarefa);
-                const prazoEtapa = situacaoEtapa(tarefa.execucaoEtapaAte);
+                const prazoEtapa = situacaoEtapa(etapaAtual.dataFim);
+                // Sem etapa de execução ainda (tarefa sem planejamento aplicado): tenta a primeira
+                // etapa do tipo (se já triada) e, na falta disso, cai pro SLA médio da própria fase
+                // atual — assim o card nunca fica com "—"/"—" antes da tarefa ganhar um fluxo.
+                // SLA de Solicitações/Triagem vem da config real (em horas, "Responsáveis e SLA
+                // padrão" em Tipos de Tarefa) — só cai pro `fase.slaDias` genérico (em dias) nas
+                // outras fases, onde não existe config equivalente.
+                const slaHorasDaFase =
+                  fase.id === "solicitacoes"
+                    ? configFluxo.slaHorasAprovacao
+                    : fase.id === "triagem"
+                      ? configFluxo.slaHorasTriagem
+                      : undefined;
+                const proximaEtapa =
+                  etapaAtual.nome
+                    ? undefined
+                    : primeiraEtapaTipo(tarefa) ??
+                      (slaHorasDaFase != null
+                        ? { nome: fase.nome, slaDias: undefined, slaHoras: slaHorasDaFase }
+                        : { nome: fase.nome, slaDias: fase.slaDias });
                 const unidadeMedidaId = tipoById(tarefa.tipoId)?.unidadeMedidaId;
                 const unidadeMedida = unidadeMedidaId
                   ? unidadeMedidaById(unidadeMedidaId)
@@ -158,7 +204,10 @@ export function KanbanBoard({
                     onDragStart={() => setDraggingId(tarefa.id)}
                     onDragEnd={() => setDraggingId(null)}
                     onClick={() => abrirTarefa(tarefa.id)}
-                    className="cursor-pointer overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm transition-all hover:ring-1 hover:ring-primary/50 active:cursor-grabbing dark:hover:ring-primary/50"
+                    className={cn(
+                      "cursor-pointer overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm transition-all hover:ring-1 hover:ring-primary/50 active:cursor-grabbing dark:hover:ring-primary/50",
+                      fase.id === "concluido" && "opacity-60 hover:opacity-100"
+                    )}
                   >
                     <div className="flex items-center justify-between gap-2 bg-muted px-4 py-2 dark:bg-white/5">
                       <span className="text-[0.65rem] font-semibold tracking-wide text-muted-foreground uppercase">
@@ -203,15 +252,24 @@ export function KanbanBoard({
                           </span>
                         </div>
                         <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-[0.7rem] font-semibold text-secondary-foreground">
-                          {etapa?.nome ?? "—"}
+                          {etapaAtual.nome ?? proximaEtapa?.nome ?? "—"}
                         </span>
                         <span
+                          title={proximaEtapa ? "SLA médio da primeira etapa" : undefined}
                           className={cn(
                             "shrink-0 rounded-full px-2 py-0.5 text-[0.7rem] font-semibold",
-                            prazoEtapa.className
+                            etapaAtual.dataFim
+                              ? prazoEtapa.className
+                              : "bg-muted text-muted-foreground"
                           )}
                         >
-                          {prazoEtapa.label}
+                          {etapaAtual.dataFim
+                            ? prazoEtapa.label
+                            : proximaEtapa?.slaHoras != null
+                              ? `SLA ${formatHoras(proximaEtapa.slaHoras)}`
+                              : proximaEtapa?.slaDias != null
+                                ? `SLA ${proximaEtapa.slaDias}d`
+                                : "—"}
                         </span>
                       </div>
 

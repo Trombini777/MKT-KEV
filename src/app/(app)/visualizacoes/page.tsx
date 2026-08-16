@@ -1,45 +1,27 @@
 "use client";
 
-import { useState } from "react";
-import { Plus } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/page-header";
 import { KanbanBoard } from "@/components/kanban-board";
 import { ListaTarefas } from "@/components/lista-tarefas";
 import { CalendarioEditorial } from "@/components/calendario-editorial";
 import { WorkloadView } from "@/components/workload-view";
+import { NovaAtividadeDialog } from "@/components/nova-atividade-dialog";
 import { cn } from "@/lib/utils";
 import { isoHoje, diasEntre } from "@/lib/hoje";
-import { useTasks, addTask, moveTask } from "@/lib/task-store";
-import { FASES, TIPOS_TAREFA } from "@/lib/mock";
-
-const PRIMEIRA_FASE = [...FASES].sort((a, b) => a.ordem - b.ordem)[0];
+import { useTasks, moveTask, recarregarTarefas } from "@/lib/task-store";
+import { useEtapas } from "@/lib/etapa-store";
+import { useColaboradores } from "@/lib/colaborador-store";
+import { useTiposTarefa } from "@/lib/tipo-tarefa-store";
 
 export default function VisualizacoesPage() {
   const tasks = useTasks();
-  const [criando, setCriando] = useState(false);
-  const [novoTitulo, setNovoTitulo] = useState("");
-
-  function confirmarNovaTarefa() {
-    const titulo = novoTitulo.trim();
-    if (!titulo) {
-      setCriando(false);
-      return;
-    }
-    addTask({
-      titulo,
-      descricao: "",
-      tipoId: TIPOS_TAREFA[0]?.id ?? "",
-      origem: "Projeto",
-      prioridadeFinal: "Normal",
-      faseAtualId: PRIMEIRA_FASE?.id ?? "",
-      dataInicio: isoHoje(),
-    });
-    setNovoTitulo("");
-    setCriando(false);
-  }
+  // KanbanBoard/ListaTarefas leem etapaById/nomeColaborador/nomeTipo direto (sem hook) —
+  // assinar aqui garante que a página re-renderize assim que esses catálogos hidratarem do
+  // Supabase.
+  useEtapas();
+  useColaboradores();
+  useTiposTarefa();
 
   const hoje = isoHoje();
   const ativas = tasks.filter((t) => t.faseAtualId !== "concluido");
@@ -81,36 +63,7 @@ export default function VisualizacoesPage() {
             <TabsTrigger value="workload">Workload</TabsTrigger>
           </TabsList>
 
-          {criando ? (
-            <div className="flex items-center gap-1.5">
-              <Input
-                autoFocus
-                value={novoTitulo}
-                onChange={(e) => setNovoTitulo(e.target.value)}
-                placeholder="Nome da tarefa"
-                className="h-8 w-64"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") confirmarNovaTarefa();
-                  if (e.key === "Escape") setCriando(false);
-                }}
-              />
-              <Button onClick={confirmarNovaTarefa}>Adicionar</Button>
-              <Button variant="ghost" onClick={() => setCriando(false)}>
-                Cancelar
-              </Button>
-            </div>
-          ) : (
-            <Button
-              className="h-8 gap-1.5 rounded-full px-5 shadow-sm"
-              onClick={() => {
-                setCriando(true);
-                setNovoTitulo("");
-              }}
-            >
-              <Plus className="size-4" />
-              Nova tarefa
-            </Button>
-          )}
+          <NovaAtividadeDialog onCriada={recarregarTarefas} />
         </div>
 
         <TabsContent value="kanban" className="mt-4">

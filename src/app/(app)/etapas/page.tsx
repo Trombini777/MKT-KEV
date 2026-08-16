@@ -10,10 +10,6 @@ export default function EtapasPage() {
       />
 
       <EtapasBoard />
-
-      <p className="mt-6 text-xs text-muted-foreground">
-        Mudanças ficam salvas neste navegador — ainda sem backend real.
-      </p>
     </div>
   );
 }

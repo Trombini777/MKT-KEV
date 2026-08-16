@@ -5,9 +5,16 @@ import { usePathname } from "next/navigation";
 import { KevLogo } from "@/components/kev-logo";
 import { NAV_SECTIONS } from "@/lib/nav";
 import { cn } from "@/lib/utils";
+import { useTasks } from "@/lib/task-store";
+
+// Fases que ainda precisam de uma ação humana antes de virar trabalho de verdade — sinalizado
+// como contador na navegação de "Gestão de Tarefas" pra não depender de ninguém lembrar de olhar.
+const FASES_PENDENTES = new Set(["solicitacoes", "triagem"]);
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const tasks = useTasks();
+  const pendentes = tasks.filter((t) => FASES_PENDENTES.has(t.faseAtualId)).length;
 
   return (
     <aside className="flex h-screen w-64 flex-col gap-6 border-r border-border/60 bg-sidebar px-3 py-4">
@@ -25,6 +32,7 @@ export function AppSidebar() {
             {section.items.map((item) => {
               const active = pathname === item.href || pathname.startsWith(item.href + "/");
               const Icon = item.icon;
+              const badge = item.href === "/visualizacoes" ? pendentes : 0;
               return (
                 <Link
                   key={item.href}
@@ -38,6 +46,16 @@ export function AppSidebar() {
                 >
                   <Icon className="size-4 shrink-0" />
                   {item.label}
+                  {badge > 0 && (
+                    <span
+                      className="ml-auto flex size-5 shrink-0 items-center justify-center rounded-full bg-sidebar-accent"
+                      title={`${badge} atividade${badge === 1 ? "" : "s"} aguardando aprovação ou triagem`}
+                    >
+                      <span className="flex size-3.5 items-center justify-center rounded-full bg-primary text-[0.55rem] font-semibold text-primary-foreground">
+                        {badge}
+                      </span>
+                    </span>
+                  )}
                 </Link>
               );
             })}

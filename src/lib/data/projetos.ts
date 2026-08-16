@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { Projeto } from "@/lib/mock";
 
 const SELECT =
-  "id, nome, sigla, descricao, tipo, departamento, responsavelId:responsavel_id, dataInicio:data_inicio, dataFim:data_fim, notasEncerramento:notas_encerramento";
+  "id, nome, sigla, descricao, tipo, departamento, responsavelId:responsavel_id, dataInicio:data_inicio, dataFim:data_fim, notasEncerramento:notas_encerramento, status";
 
 /** Leitura server-side dos projetos/campanhas — sem tela de criação ainda (ver docs/PLAN.md M3). */
 export async function getProjetos(): Promise<Projeto[]> {

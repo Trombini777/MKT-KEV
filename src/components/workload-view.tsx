@@ -12,7 +12,14 @@ const FILTRO_ATIVO_CLASS =
 export function WorkloadView({
   title,
   pessoaId,
-}: { title?: string; pessoaId?: string } = {}) {
+  diaSelecionado,
+  onSelecionarDia,
+}: {
+  title?: string;
+  pessoaId?: string;
+  diaSelecionado?: string | null;
+  onSelecionarDia?: (iso: string) => void;
+} = {}) {
   const [intervalo, setIntervalo] = useState("7");
   const dias = useMemo(() => gerarDias(new Date(), Number(intervalo)), [intervalo]);
   const tarefas = useTasks();
@@ -41,7 +48,13 @@ export function WorkloadView({
           </TabsList>
         </Tabs>
       </div>
-      <PersonDayGrid dias={dias} colaboradorId={pessoaId} tarefas={tarefas} />
+      <PersonDayGrid
+        dias={dias}
+        colaboradorId={pessoaId}
+        tarefas={tarefas}
+        diaSelecionado={diaSelecionado}
+        onSelecionarDia={onSelecionarDia}
+      />
     </div>
   );
 }

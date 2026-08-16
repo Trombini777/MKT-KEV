@@ -5,10 +5,12 @@ import { createClient } from "@/lib/supabase/client";
 // Substitui o antigo USUARIO_ATUAL_ID hardcoded (mock/current-user.ts): resolve, uma vez por
 // sessão do navegador, qual colaborador está vinculado (via `auth_user_id`) ao usuário logado
 // agora — usado pelos stores client-side pra assinar histórico/comentários como autor real.
-let cache: { id: string; nome: string } | null = null;
-let carregando: Promise<{ id: string; nome: string } | null> | null = null;
+type ColaboradorAtual = { id: string; nome: string; email: string };
 
-export async function obterColaboradorAtual(): Promise<{ id: string; nome: string } | null> {
+let cache: ColaboradorAtual | null = null;
+let carregando: Promise<ColaboradorAtual | null> | null = null;
+
+export async function obterColaboradorAtual(): Promise<ColaboradorAtual | null> {
   if (cache) return cache;
   if (!carregando) {
     carregando = (async () => {
@@ -19,7 +21,7 @@ export async function obterColaboradorAtual(): Promise<{ id: string; nome: strin
       if (!user) return null;
       const { data } = await supabase
         .from("colaboradores")
-        .select("id, nome")
+        .select("id, nome, email")
         .eq("auth_user_id", user.id)
         .maybeSingle();
       if (!data) return null;

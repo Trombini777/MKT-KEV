@@ -23,6 +23,7 @@ const STATUS_VARIANT: Record<StatusColaborador, "default" | "outline" | "destruc
  * (maior cargo) para a direita (menor cargo). Cargos que não batem com nenhum termo ficam no
  * nível intermediário (individual contributor). */
 const NIVEIS_CARGO: { termo: string; nivel: number }[] = [
+  { termo: "superintendente", nivel: 0 },
   { termo: "diretor", nivel: 0 },
   { termo: "diretora", nivel: 0 },
   { termo: "gerente", nivel: 1 },
