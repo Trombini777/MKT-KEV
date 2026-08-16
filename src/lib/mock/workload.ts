@@ -1,14 +1,9 @@
 import { TAREFAS } from "./tarefas";
 import { COLABORADORES } from "./colaboradores";
 import type { Tarefa } from "./types";
+import { dataParaIso, DIAS_SEMANA_CURTO } from "@/lib/hoje";
 
 export type DiaGrade = { iso: string; label: string; fimDeSemana: boolean };
-
-const DIAS_SEMANA_CURTO = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
-
-function toIso(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
 
 export function gerarDias(base: Date, quantidade: number): DiaGrade[] {
   const dias: DiaGrade[] = [];
@@ -17,7 +12,7 @@ export function gerarDias(base: Date, quantidade: number): DiaGrade[] {
     d.setDate(base.getDate() + i);
     const diaSemana = d.getDay();
     dias.push({
-      iso: toIso(d),
+      iso: dataParaIso(d),
       label: DIAS_SEMANA_CURTO[diaSemana],
       fimDeSemana: diaSemana === 0 || diaSemana === 6,
     });

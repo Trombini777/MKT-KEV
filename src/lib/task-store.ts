@@ -14,7 +14,7 @@ import {
   type HistoricoEvento,
 } from "@/lib/mock";
 import { proximoDia, proximoDiaUtil } from "@/lib/scheduling";
-import { isoHoje, diasEntre } from "@/lib/hoje";
+import { isoHoje, diasEntre, formatDataCompleta } from "@/lib/hoje";
 import { createClient } from "@/lib/supabase/client";
 import { obterColaboradorAtual } from "@/lib/current-colaborador-client";
 import { obterConfiguracoesFluxo } from "@/lib/configuracoes-fluxo";
@@ -731,11 +731,19 @@ export async function vincularProjeto(taskId: string, projetoId: string, nomePro
   emit();
 }
 
-/** Renegocia o prazo final da tarefa com o solicitante e registra no histórico. */
+/**
+ * Marcador de texto (sem coluna própria no banco) pra sinalizar eventos de histórico que merecem
+ * destaque visual — o card amarelo de atenção no histórico (task-detail-sheet.tsx) é decidido por
+ * `descricao.startsWith(ATENCAO_PREFIXO)`, não por um campo estruturado.
+ */
+export const ATENCAO_PREFIXO = "[atenção] ";
+
+/** Altera o prazo final de conclusão da tarefa e registra no histórico, com destaque de atenção. */
 export async function atualizarPrazoTarefa(taskId: string, novoPrazo: string) {
   const t = tasks.find((x) => x.id === taskId);
   if (!t) return;
-  const prazoAntigoFormatado = t.prazo || "sem prazo definido";
+  const prazoAntigoFormatado = formatDataCompleta(t.prazo);
+  const prazoNovoFormatado = formatDataCompleta(novoPrazo);
   const supabase = createClient();
   const { error } = await supabase.from("tarefas").update({ prazo: novoPrazo || null }).eq("id", taskId);
   if (error) {
@@ -746,7 +754,7 @@ export async function atualizarPrazoTarefa(taskId: string, novoPrazo: string) {
   const hist = await inserirHistorico(
     supabase,
     taskId,
-    `${autor?.nome ?? "Alguém"} renegociou o prazo com o solicitante: de ${prazoAntigoFormatado} para ${novoPrazo}`,
+    `${ATENCAO_PREFIXO}${autor?.nome ?? "Alguém"} alterou o prazo de conclusão: de ${prazoAntigoFormatado} para ${prazoNovoFormatado}`,
     { faseId: t.faseAtualId }
   );
   tasks = tasks.map((x) => (x.id === taskId ? { ...x, prazo: novoPrazo, historico: [...x.historico, hist] } : x));

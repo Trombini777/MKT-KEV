@@ -7,10 +7,12 @@ import type { ReactNode } from "react";
 export function TaskLink({
   taskId,
   className,
+  title,
   children,
 }: {
   taskId: string;
   className?: string;
+  title?: string;
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -19,7 +21,7 @@ export function TaskLink({
   params.set("tarefa", taskId);
 
   return (
-    <Link href={`${pathname}?${params.toString()}`} scroll={false} className={className}>
+    <Link href={`${pathname}?${params.toString()}`} scroll={false} className={className} title={title}>
       {children}
     </Link>
   );

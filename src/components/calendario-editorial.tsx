@@ -2,31 +2,13 @@
 
 import { TaskLink } from "@/components/task-link";
 import { useTasks } from "@/lib/task-store";
+import { dataParaIso, gerarGradeMes, DIAS_SEMANA_CURTO, NOMES_MESES } from "@/lib/hoje";
 import { nomeTipo, type Tarefa } from "@/lib/mock";
-
-const DIAS_SEMANA = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
-const MESES = [
-  "janeiro", "fevereiro", "março", "abril", "maio", "junho",
-  "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
-];
-
-function toIso(d: Date) {
-  return d.toISOString().slice(0, 10);
-}
 
 export function CalendarioEditorial() {
   const tasks = useTasks();
   const hoje = new Date();
-  const primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-  const ultimoDia = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
-  const offsetInicial = primeiroDia.getDay();
-
-  const celulas: (Date | null)[] = [];
-  for (let i = 0; i < offsetInicial; i++) celulas.push(null);
-  for (let dia = 1; dia <= ultimoDia.getDate(); dia++) {
-    celulas.push(new Date(hoje.getFullYear(), hoje.getMonth(), dia));
-  }
-  while (celulas.length % 7 !== 0) celulas.push(null);
+  const celulas = gerarGradeMes(hoje.getFullYear(), hoje.getMonth());
 
   const tarefasPorDia = new Map<string, Tarefa[]>();
   for (const t of tasks) {
@@ -36,22 +18,22 @@ export function CalendarioEditorial() {
     tarefasPorDia.set(t.prazo, lista);
   }
 
-  const hojeIso = toIso(hoje);
+  const hojeIso = dataParaIso(hoje);
 
   return (
     <div>
       <p className="mb-3 text-sm font-medium capitalize">
-        {MESES[hoje.getMonth()]} de {hoje.getFullYear()}
+        {NOMES_MESES[hoje.getMonth()]} de {hoje.getFullYear()}
       </p>
       <div className="grid grid-cols-7 gap-px overflow-hidden rounded-xl border border-border/60 bg-border/60">
-        {DIAS_SEMANA.map((d) => (
+        {DIAS_SEMANA_CURTO.map((d) => (
           <div key={d} className="bg-muted/50 px-2 py-1.5 text-center text-xs text-muted-foreground">
             {d}
           </div>
         ))}
         {celulas.map((data, i) => {
           if (!data) return <div key={i} className="min-h-24 bg-background" />;
-          const iso = toIso(data);
+          const iso = dataParaIso(data);
           const tarefas = tarefasPorDia.get(iso) ?? [];
           const ehHoje = iso === hojeIso;
           return (

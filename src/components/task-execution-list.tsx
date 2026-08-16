@@ -4,30 +4,23 @@ import type { ReactNode } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { AlertCircle, CirclePlay } from "lucide-react";
 import { PriorityBadge } from "@/components/priority-badge";
-import { StatusProjetoBadge } from "@/components/status-projeto-badge";
 import { TaskLink } from "@/components/task-link";
 import { cn } from "@/lib/utils";
-import { isoHoje, diasEntre } from "@/lib/hoje";
+import { isoHoje, diasEntre, formatDataCurta } from "@/lib/hoje";
 import { useProjetos } from "@/lib/projeto-store";
 import {
   estaEmRisco,
   infoEtapaAtual,
-  nomeColaborador,
   projetoById,
   type Tarefa,
 } from "@/lib/mock";
-
-function formatDataCurta(iso: string): string {
-  const [, mes, dia] = iso.split("-");
-  return `${dia}/${mes}`;
-}
 
 function situacaoEtapa(iso?: string): { label: string; className: string } {
   if (!iso) return { label: "—", className: "bg-secondary text-muted-foreground" };
   const dias = diasEntre(isoHoje(), iso);
   if (dias < 0) return { label: `Atrasado ${Math.abs(dias)}d`, className: "bg-destructive text-white" };
   if (dias === 0) return { label: "Hoje", className: "bg-primary text-primary-foreground" };
-  if (dias === 1) return { label: "Amanhã", className: "bg-success text-success-foreground" };
+  if (dias === 1) return { label: "Amanhã", className: "bg-success/10 text-success" };
   return { label: formatDataCurta(iso), className: "bg-secondary text-secondary-foreground" };
 }
 
@@ -58,7 +51,7 @@ function campanhaDaTarefa(tarefa: Tarefa): string {
 }
 
 function bucketDoPrazo(iso?: string): { chave: string; nome: string; ordem: number } {
-  if (!iso) return { chave: "sem-prazo", nome: "Suas atividades", ordem: 2 };
+  if (!iso) return { chave: "sem-prazo", nome: "Sem prazo definido", ordem: 2 };
   const dias = diasEntre(isoHoje(), iso);
   if (dias <= 0) return { chave: "hoje", nome: "Hoje", ordem: 0 };
   return { chave: "proximos", nome: "Próximos dias", ordem: 1 };
@@ -76,7 +69,7 @@ function CampoTarefa({ label, children }: { label: string; children: ReactNode }
 }
 
 const COLUNAS_CARD =
-  "grid grid-cols-[1fr_1.1fr_1fr_0.6fr_0.8fr_1.2fr_1.2fr_0.7fr] gap-x-4 gap-y-3";
+  "grid grid-cols-[0.7fr_1fr_1fr_1.1fr_0.6fr_0.8fr_1.2fr_1.2fr] gap-x-4 gap-y-3";
 
 function TagCampo({ label, className }: { label: string; className: string }) {
   return (
@@ -103,9 +96,7 @@ function TaskCard({ tarefa }: { tarefa: Tarefa }) {
   const etapa = infoEtapaAtual(tarefa);
   const situacaoExecucao = situacaoEtapa(etapa.dataFim);
   const situacaoConclusao = situacaoPrazo(tarefa.prazo);
-  const executorId = etapa.executorId;
   const esforco = etapa.esforco;
-  const projetoVinculado = tarefa.projetoId ? projetoById(tarefa.projetoId) : undefined;
 
   function abrirTarefa() {
     const params = new URLSearchParams(searchParams.toString());
@@ -136,35 +127,38 @@ function TaskCard({ tarefa }: { tarefa: Tarefa }) {
           <TaskLink taskId={tarefa.id} className="truncate text-lg font-semibold hover:underline">
             {tarefa.titulo}
           </TaskLink>
-          {projetoVinculado && (
-            <>
-              <span
-                className="shrink-0 truncate rounded-full bg-muted px-2 py-0.5 text-[0.7rem] font-medium text-muted-foreground"
-                title={`Vinculada ao ${projetoVinculado.tipo.toLowerCase()} "${projetoVinculado.nome}"`}
-              >
-                {projetoVinculado.nome}
-              </span>
-              <StatusProjetoBadge status={projetoVinculado.status} />
-            </>
-          )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <span className="text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase">
             Concluir tarefa até
           </span>
           <TagCampo label={situacaoConclusao.label} className={situacaoConclusao.className} />
+          <TagCampo
+            label={emRisco ? "Atividade atrasada" : "Atividade em dia"}
+            className={emRisco ? "bg-destructive text-white" : "bg-success/10 text-success"}
+          />
         </div>
       </div>
 
       <div className={cn("border-t border-border/60 pt-4", COLUNAS_CARD)}>
+        <CampoTarefa label="Prioridade">
+          <PriorityBadge prioridade={tarefa.prioridadeFinal} />
+        </CampoTarefa>
         <CampoTarefa label="Etapa">
           <TagCampo label={etapa.nome ?? "—"} className="bg-secondary text-secondary-foreground" />
         </CampoTarefa>
-        <CampoTarefa label="Executor">
-          <TagCampo label={nomeColaborador(executorId)} className="bg-secondary text-secondary-foreground" />
-        </CampoTarefa>
         <CampoTarefa label="Executar etapa até">
           <TagCampo label={situacaoExecucao.label} className={situacaoExecucao.className} />
+        </CampoTarefa>
+        <CampoTarefa label="Projeção de entrega">
+          {tarefa.previsaoConclusao ? (
+            <TagCampo
+              label={formatDataCurta(tarefa.previsaoConclusao)}
+              className={emRisco ? "bg-destructive text-white" : "bg-success/10 text-success"}
+            />
+          ) : (
+            "—"
+          )}
         </CampoTarefa>
         <CampoTarefa label="Esforço">{esforco ? `${esforco}h` : "—"}</CampoTarefa>
         <CampoTarefa label="BU">
@@ -180,24 +174,13 @@ function TaskCard({ tarefa }: { tarefa: Tarefa }) {
             {campanhaDaTarefa(tarefa)}
           </span>
         </CampoTarefa>
-        <CampoTarefa label="Prioridade">
-          <PriorityBadge prioridade={tarefa.prioridadeFinal} />
-        </CampoTarefa>
       </div>
     </div>
   );
 }
 
 export function TaskExecutionList({ tarefas }: { tarefas: Tarefa[] }) {
-  if (tarefas.length === 0) {
-    return (
-      <p className="rounded-xl border border-border/60 bg-card py-6 text-center text-sm text-muted-foreground">
-        Nada na sua fila agora.
-      </p>
-    );
-  }
-
-  const grupos = new Map<string, { nome: string; ordem: number; tarefas: Tarefa[] }>();
+  const grupos = new Map<string, { chave: string; nome: string; ordem: number; tarefas: Tarefa[] }>();
 
   for (const tarefa of tarefas) {
     const bucket = bucketDoPrazo(tarefa.execucaoEtapaAte);
@@ -205,29 +188,46 @@ export function TaskExecutionList({ tarefas }: { tarefas: Tarefa[] }) {
     if (grupo) {
       grupo.tarefas.push(tarefa);
     } else {
-      grupos.set(bucket.chave, { nome: bucket.nome, ordem: bucket.ordem, tarefas: [tarefa] });
+      grupos.set(bucket.chave, { chave: bucket.chave, nome: bucket.nome, ordem: bucket.ordem, tarefas: [tarefa] });
     }
   }
 
   const gruposOrdenados = [...grupos.values()].sort((a, b) => a.ordem - b.ordem);
 
   return (
-    <div className="flex flex-col gap-6">
-      {gruposOrdenados.map((grupo) => (
-        <div key={grupo.nome}>
-          <div className="mb-3 flex items-center gap-2">
-            <h3 className="text-base font-semibold">{grupo.nome}</h3>
-            <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-muted px-1.5 py-0.5 text-xs font-semibold text-muted-foreground">
-              {grupo.tarefas.length}
-            </span>
-          </div>
-          <div className="flex flex-col gap-3">
-            {grupo.tarefas.map((tarefa) => (
-              <TaskCard key={tarefa.id} tarefa={tarefa} />
-            ))}
-          </div>
+    <div>
+      <div className="mb-3 flex items-center gap-2">
+        <h2 className="text-sm font-semibold">Suas atividades</h2>
+        <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-muted px-1.5 py-0.5 text-xs font-semibold text-muted-foreground">
+          {tarefas.length}
+        </span>
+      </div>
+
+      {tarefas.length === 0 ? (
+        <p className="rounded-xl border border-border/60 bg-card py-6 text-center text-sm text-muted-foreground">
+          Nada na sua fila agora.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-6">
+          {gruposOrdenados.map((grupo) => (
+            <div key={grupo.chave}>
+              {grupo.chave !== "sem-prazo" && (
+                <div className="mb-3 flex items-center gap-2">
+                  <h3 className="text-base font-semibold">{grupo.nome}</h3>
+                  <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-muted px-1.5 py-0.5 text-xs font-semibold text-muted-foreground">
+                    {grupo.tarefas.length}
+                  </span>
+                </div>
+              )}
+              <div className="flex flex-col gap-3">
+                {grupo.tarefas.map((tarefa) => (
+                  <TaskCard key={tarefa.id} tarefa={tarefa} />
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
-      ))}
+      )}
     </div>
   );
 }

@@ -5,9 +5,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PersonDayGrid } from "@/components/person-day-grid";
 import { gerarDias } from "@/lib/mock";
 import { useTasks } from "@/lib/task-store";
-
-const FILTRO_ATIVO_CLASS =
-  "data-active:border-transparent data-active:bg-primary data-active:text-primary-foreground data-active:shadow-none dark:data-active:border-transparent dark:data-active:bg-primary dark:data-active:text-primary-foreground";
+import { TABS_ATIVO_PRIMARY_CLASS } from "@/lib/utils";
 
 export function WorkloadView({
   title,
@@ -36,13 +34,13 @@ export function WorkloadView({
         )}
         <Tabs value={intervalo} onValueChange={(v) => v && setIntervalo(v)}>
           <TabsList>
-            <TabsTrigger value="7" className={FILTRO_ATIVO_CLASS}>
+            <TabsTrigger value="7" className={TABS_ATIVO_PRIMARY_CLASS}>
               7D
             </TabsTrigger>
-            <TabsTrigger value="15" className={FILTRO_ATIVO_CLASS}>
+            <TabsTrigger value="15" className={TABS_ATIVO_PRIMARY_CLASS}>
               15D
             </TabsTrigger>
-            <TabsTrigger value="30" className={FILTRO_ATIVO_CLASS}>
+            <TabsTrigger value="30" className={TABS_ATIVO_PRIMARY_CLASS}>
               30D
             </TabsTrigger>
           </TabsList>

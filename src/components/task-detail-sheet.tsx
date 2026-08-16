@@ -36,9 +36,9 @@ import {
   adicionarComentario,
   adicionarAnexo,
   adicionarLink,
-  alternarChecklistItem,
-  adicionarChecklistItem,
   ajustarEtapaEmExecucao,
+  atualizarPrazoTarefa,
+  ATENCAO_PREFIXO,
 } from "@/lib/task-store";
 import { useEtapas } from "@/lib/etapa-store";
 import { useColaboradores } from "@/lib/colaborador-store";
@@ -87,7 +87,7 @@ import {
   FileText,
   Pencil,
 } from "lucide-react";
-import { useState, useRef } from "react";
+import { useState } from "react";
 
 function formatData(iso: string) {
   if (!iso) return "-";
@@ -137,6 +137,9 @@ function tituloEPessoaHistorico(
   }
   if (h.acao === "recusada") {
     return { titulo: "Recusa de solicitação", pessoa: nomeColaborador(h.autorId) };
+  }
+  if (h.descricao.startsWith(ATENCAO_PREFIXO)) {
+    return { titulo: h.descricao.slice(ATENCAO_PREFIXO.length), pessoa: nomeColaborador(h.autorId) };
   }
   return { titulo: h.descricao, pessoa: nomeColaborador(h.autorId) };
 }
@@ -214,16 +217,16 @@ export function TaskDetailSheet() {
   const [atribuindoResponsavel, setAtribuindoResponsavel] = useState(false);
   const [novoComentario, setNovoComentario] = useState("");
   const [novoLink, setNovoLink] = useState("");
-  const [novoChecklistItem, setNovoChecklistItem] = useState("");
   const [editandoEtapaAtual, setEditandoEtapaAtual] = useState(false);
   const [dataEtapaInput, setDataEtapaInput] = useState("");
   const [horasEtapaInput, setHorasEtapaInput] = useState("");
+  const [editandoPrazo, setEditandoPrazo] = useState(false);
+  const [prazoInput, setPrazoInput] = useState("");
   const [etapaVisualizadaOrdem, setEtapaVisualizadaOrdem] = useState<number | null>(null);
   const [sequenciaAberta, setSequenciaAberta] = useState(false);
   const [etapaAtualChecada, setEtapaAtualChecada] = useState<Record<string, boolean>>({});
   const [editandoTitulo, setEditandoTitulo] = useState(false);
   const [tituloInput, setTituloInput] = useState("");
-  const comentarioInputRef = useRef<HTMLInputElement>(null);
 
   function close() {
     const params = new URLSearchParams(searchParams.toString());
@@ -326,16 +329,64 @@ export function TaskDetailSheet() {
   return (
     <Dialog open onOpenChange={(open) => !open && close()}>
       <DialogContent className="flex max-h-[85vh] w-full max-w-6xl flex-col gap-0 overflow-hidden p-0 sm:max-w-6xl">
-        <div className="border-b border-border/60 px-5 py-4 pr-12">
+        <div className="border-b border-border/60 px-5 py-4">
           <div className="flex flex-wrap items-center gap-2">
             <PriorityBadge prioridade={tarefa.prioridadeFinal} />
             <span className="text-xs text-muted-foreground">{nomeTipo(tarefa.tipoId)}</span>
             <span className={cn("text-xs font-medium", corFaseAtual.text)}>· {fase?.nome}</span>
-            {emRisco && (
-              <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-semibold text-destructive">
-                Em risco
-              </span>
-            )}
+
+            <div className="flex shrink-0 items-center gap-1.5">
+              <Select
+                items={Object.fromEntries(
+                  projetosParaVincular("Projeto", tarefa.projetoId).map((p) => [p.id, p.nome])
+                )}
+                value={projeto?.tipo === "Projeto" ? (tarefa.projetoId ?? "") : ""}
+                onValueChange={(v) => {
+                  if (typeof v !== "string" || !v) return;
+                  const p = PROJETOS.find((x) => x.id === v);
+                  vincularProjeto(tarefa.id, v, p?.nome ?? "");
+                }}
+              >
+                <SelectTrigger
+                  size="sm"
+                  className="w-fit max-w-32 gap-1 rounded-full border-transparent bg-muted px-2.5 text-xs font-semibold text-muted-foreground hover:bg-muted/70 data-placeholder:font-normal"
+                >
+                  <SelectValue placeholder="Projeto" className="truncate" />
+                </SelectTrigger>
+                <SelectContent>
+                  {projetosParaVincular("Projeto", tarefa.projetoId).map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                items={Object.fromEntries(
+                  projetosParaVincular("Campanha", tarefa.projetoId).map((p) => [p.id, p.nome])
+                )}
+                value={projeto?.tipo === "Campanha" ? (tarefa.projetoId ?? "") : ""}
+                onValueChange={(v) => {
+                  if (typeof v !== "string" || !v) return;
+                  const p = PROJETOS.find((x) => x.id === v);
+                  vincularProjeto(tarefa.id, v, p?.nome ?? "");
+                }}
+              >
+                <SelectTrigger
+                  size="sm"
+                  className="w-fit max-w-32 gap-1 rounded-full border-transparent bg-muted px-2.5 text-xs font-semibold text-muted-foreground hover:bg-muted/70 data-placeholder:font-normal"
+                >
+                  <SelectValue placeholder="Campanha" className="truncate" />
+                </SelectTrigger>
+                <SelectContent>
+                  {projetosParaVincular("Campanha", tarefa.projetoId).map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="mt-1 flex items-center gap-1.5">
             <FileText className="size-4 shrink-0 text-muted-foreground" />
@@ -576,6 +627,7 @@ export function TaskDetailSheet() {
                       const colapsado = historicoColapsado[h.id] ?? false;
                       const indiceOriginal = tarefa.historico.indexOf(h);
                       const { titulo, pessoa } = tituloEPessoaHistorico(h, indiceOriginal, tarefa);
+                      const atencao = h.descricao.startsWith(ATENCAO_PREFIXO);
                       return (
                         <div
                           key={h.id}
@@ -584,10 +636,18 @@ export function TaskDetailSheet() {
                           <div
                             className={cn(
                               "flex items-center justify-between px-3 py-2",
-                              COR_FASE_HISTORICO[h.faseId!] ?? "bg-muted text-muted-foreground"
+                              atencao
+                                ? "bg-warning/15 text-warning"
+                                : (COR_FASE_HISTORICO[h.faseId!] ?? "bg-muted text-muted-foreground")
                             )}
                           >
-                            <span className="text-xs font-semibold">{faseHist?.nome ?? h.faseId}</span>
+                            <span className="flex items-center gap-1.5 text-xs font-semibold">
+                              {atencao && <AlertTriangle className="size-3.5 shrink-0" />}
+                              {/* Título fixo — hoje ATENCAO_PREFIXO só marca alteração de prazo
+                                  (atualizarPrazoTarefa). Se virar usado por outro tipo de evento,
+                                  este texto precisa ficar dinâmico em vez de fixo. */}
+                              {atencao ? "[ATENÇÃO] - Data de entrega" : (faseHist?.nome ?? h.faseId)}
+                            </span>
                             <span className="text-xs font-medium opacity-80">
                               {dataAbreviada(h.data)}
                             </span>
@@ -657,7 +717,7 @@ export function TaskDetailSheet() {
               {tarefa.planejamento ? (
                 <div>
                   <ColunaLabel>Etapa atual</ColunaLabel>
-                  <div className="mt-2 flex flex-wrap items-center gap-3">
+                  <div className="mt-2 flex flex-col items-start gap-3">
                     <button
                       type="button"
                       onClick={() => {
@@ -970,52 +1030,6 @@ export function TaskDetailSheet() {
               )}
 
               <div>
-                <ColunaLabel>Checklist</ColunaLabel>
-                <div className="mt-2 flex flex-col gap-1.5">
-                  {tarefa.checklist.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => alternarChecklistItem(tarefa.id, item.id)}
-                      className="flex items-center gap-2 text-left text-sm"
-                    >
-                      {item.feito ? (
-                        <CheckSquare className="size-4 shrink-0 text-primary" />
-                      ) : (
-                        <Square className="size-4 shrink-0 text-muted-foreground" />
-                      )}
-                      <span className={item.feito ? "text-muted-foreground line-through" : ""}>
-                        {item.texto}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    adicionarChecklistItem(tarefa.id, novoChecklistItem);
-                    setNovoChecklistItem("");
-                  }}
-                  className="mt-2 flex items-center gap-1.5"
-                >
-                  <Input
-                    value={novoChecklistItem}
-                    onChange={(e) => setNovoChecklistItem(e.target.value)}
-                    placeholder="Novo item do checklist"
-                    className="h-8 text-sm"
-                  />
-                  <button
-                    type="submit"
-                    disabled={!novoChecklistItem.trim()}
-                    className="shrink-0 text-muted-foreground hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
-                    aria-label="Adicionar item"
-                  >
-                    <Plus className="size-4" />
-                  </button>
-                </form>
-              </div>
-
-              <div>
                 <ColunaLabel>Anexos e links</ColunaLabel>
                 <div className="mt-2 flex flex-col gap-1.5">
                   {(tarefa.anexos ?? []).map((nome, i) => (
@@ -1110,7 +1124,6 @@ export function TaskDetailSheet() {
                   className="mt-2 flex items-center gap-1.5"
                 >
                   <Input
-                    ref={comentarioInputRef}
                     value={novoComentario}
                     onChange={(e) => setNovoComentario(e.target.value)}
                     placeholder="Adicionar comentário"
@@ -1239,18 +1252,6 @@ export function TaskDetailSheet() {
 
         {tarefa.planejamento && etapaVisualizada && (
           <div className="flex flex-shrink-0 flex-wrap items-center gap-4 border-t border-border/60 bg-card px-4 py-2.5">
-            <button
-              type="button"
-              onClick={() => {
-                comentarioInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-                comentarioInputRef.current?.focus();
-              }}
-              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90"
-              aria-label="Ir para comentários"
-            >
-              <MessageSquareText className="size-4" />
-            </button>
-
             <div className="flex shrink-0 items-center gap-0.5">
               <button
                 type="button"
@@ -1466,58 +1467,76 @@ export function TaskDetailSheet() {
             )}
 
             <span className="shrink-0 text-sm text-muted-foreground">
-              Concluir tarefa até{" "}
-              <span className="font-medium text-foreground">
-                {formatData(tarefa.prazo || tarefa.planejamento.previsaoConclusao)}
+              Projeção de entrega{" "}
+              <span className={cn("font-medium", emRisco ? "text-destructive" : "text-success")}>
+                {formatData(tarefa.planejamento.previsaoConclusao)}
               </span>
             </span>
 
-            <div className="ml-auto flex shrink-0 items-center gap-2">
-              <Select
-                items={Object.fromEntries(
-                  projetosParaVincular("Projeto", tarefa.projetoId).map((p) => [p.id, p.nome])
-                )}
-                value={projeto?.tipo === "Projeto" ? (tarefa.projetoId ?? "") : ""}
-                onValueChange={(v) => {
-                  if (typeof v !== "string" || !v) return;
-                  const p = PROJETOS.find((x) => x.id === v);
-                  vincularProjeto(tarefa.id, v, p?.nome ?? "");
+            {!editandoPrazo ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setPrazoInput(tarefa.prazo || tarefa.planejamento!.previsaoConclusao);
+                  setEditandoPrazo(true);
                 }}
+                className="flex shrink-0 items-center gap-1.5 text-sm"
               >
-                <SelectTrigger className="h-8 w-44 gap-1.5 text-xs">
-                  <SelectValue placeholder="Projeto" className="truncate" />
-                </SelectTrigger>
-                <SelectContent>
-                  {projetosParaVincular("Projeto", tarefa.projetoId).map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select
-                items={Object.fromEntries(
-                  projetosParaVincular("Campanha", tarefa.projetoId).map((p) => [p.id, p.nome])
-                )}
-                value={projeto?.tipo === "Campanha" ? (tarefa.projetoId ?? "") : ""}
-                onValueChange={(v) => {
-                  if (typeof v !== "string" || !v) return;
-                  const p = PROJETOS.find((x) => x.id === v);
-                  vincularProjeto(tarefa.id, v, p?.nome ?? "");
-                }}
-              >
-                <SelectTrigger className="h-8 w-44 gap-1.5 text-xs">
-                  <SelectValue placeholder="Campanha" className="truncate" />
-                </SelectTrigger>
-                <SelectContent>
-                  {projetosParaVincular("Campanha", tarefa.projetoId).map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <span className="text-sm text-muted-foreground">Concluir tarefa até</span>
+                <span
+                  className={cn(
+                    "flex items-center gap-1 font-medium underline decoration-dotted underline-offset-2",
+                    emRisco ? "text-destructive" : "text-success"
+                  )}
+                >
+                  <Calendar className="size-3.5 shrink-0" />
+                  {formatData(tarefa.prazo || tarefa.planejamento.previsaoConclusao)}
+                </span>
+              </button>
+            ) : (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-sm text-muted-foreground">Concluir tarefa até</span>
+                <Input
+                  type="date"
+                  autoFocus
+                  value={prazoInput}
+                  onChange={(e) => setPrazoInput(e.target.value)}
+                  className="h-7 w-36 text-xs"
+                />
+                <button
+                  type="button"
+                  disabled={!prazoInput || !anoDoPrazoValido(prazoInput)}
+                  title={prazoInput && !anoDoPrazoValido(prazoInput) ? MENSAGEM_ANO_INVALIDO : "Salvar"}
+                  onClick={() => {
+                    atualizarPrazoTarefa(tarefa.id, prazoInput);
+                    setEditandoPrazo(false);
+                  }}
+                  className="shrink-0 text-success disabled:cursor-not-allowed disabled:text-muted-foreground/40"
+                  aria-label="Salvar"
+                >
+                  <Check className="size-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditandoPrazo(false)}
+                  className="shrink-0 text-muted-foreground"
+                  aria-label="Cancelar"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+            )}
 
+            <span
+              className={cn(
+                "shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold",
+                emRisco ? "bg-destructive/10 text-destructive" : "bg-success/10 text-success"
+              )}
+            >
+              {emRisco ? "Atividade atrasada" : "Atividade em dia"}
+            </span>
+
+            <div className="ml-auto flex shrink-0 items-center gap-2">
               {emBacklog && (
                 <button
                   type="button"
