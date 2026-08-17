@@ -1,22 +1,29 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { colaboradorById, iniciaisColaborador } from "@/lib/mock";
+import { colaboradorById, iniciaisColaborador, type Colaborador } from "@/lib/mock";
 
 export function ColaboradorAvatar({
   colaboradorId,
+  colaborador,
   className,
   fallbackClassName,
 }: {
-  colaboradorId: string | undefined;
+  colaboradorId?: string;
+  /**
+   * Passe o colaborador já carregado (ex: vindo direto do servidor, como `usuarioAtual`) quando
+   * disponível — evita depender do catálogo client-side (`colaboradorById`), que só hidrata com
+   * dados reais depois do primeiro carregamento e não dispara novo render quando isso acontece.
+   */
+  colaborador?: Colaborador | null;
   className?: string;
   fallbackClassName?: string;
 }) {
-  const avatarUrl = colaboradorId ? colaboradorById(colaboradorId)?.avatarUrl : undefined;
+  const resolvido = colaborador ?? (colaboradorId ? colaboradorById(colaboradorId) : undefined);
 
   return (
     <Avatar className={className}>
-      {avatarUrl && <AvatarImage src={avatarUrl} alt="" />}
+      {resolvido?.avatarUrl && <AvatarImage src={resolvido.avatarUrl} alt="" />}
       <AvatarFallback className={fallbackClassName}>
-        {iniciaisColaborador(colaboradorId)}
+        {resolvido?.avatarIniciais ?? iniciaisColaborador(colaboradorId)}
       </AvatarFallback>
     </Avatar>
   );

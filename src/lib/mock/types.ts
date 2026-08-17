@@ -181,6 +181,13 @@ export type PlanejamentoTarefa = {
   etapaAtualOrdem: number;
 };
 
+/**
+ * Status da atividade — ortogonal à fase do fluxo (faseAtualId). Nasce "Ativa"; vira "Concluída"
+ * automaticamente quando a tarefa chega na fase final "concluido"; "Pausada"/"Arquivada" são
+ * decisões manuais do usuário e tiram a tarefa da contagem de Workload e Painel de Trabalho.
+ */
+export type StatusAtividade = "Ativa" | "Pausada" | "Concluída" | "Arquivada";
+
 export type Tarefa = {
   id: string;
   titulo: string;
@@ -213,6 +220,7 @@ export type Tarefa = {
   prioridadeSugerida?: PrioridadeSugerida;
   prioridadeFinal: PrioridadeFinal;
   faseAtualId: string;
+  statusAtividade: StatusAtividade;
   etapaAtualId?: string;
   execucaoEtapaAte?: string;
   dataInicio: string;

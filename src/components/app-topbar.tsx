@@ -15,7 +15,7 @@ export function AppTopbar({ usuarioAtual }: { usuarioAtual: Colaborador | null }
         {usuarioAtual && (
           <div className="flex items-center gap-2">
             <ColaboradorAvatar
-              colaboradorId={usuarioAtual.id}
+              colaborador={usuarioAtual}
               className="size-7"
               fallbackClassName="text-xs"
             />

@@ -14,7 +14,7 @@ const NIVEL_CLASSES: Record<string, string> = {
   good: "bg-success/10 text-success",
   warn: "bg-warning/15 text-warning",
   crit: "bg-destructive/10 text-destructive",
-  off: "bg-muted/50 text-muted-foreground/50",
+  off: "bg-muted/50 text-muted-foreground/50 dark:text-muted-foreground/85",
 };
 
 export function PersonDayGrid({

@@ -17,11 +17,13 @@ import {
   tarefasParaExecutarAgora,
   atividadesEntrandoEmBreve,
   tarefasComAlocacaoNoDia,
+  tarefaContaNoWorkload,
   type Colaborador,
 } from "@/lib/mock";
 
 export function PainelDeTrabalho({ usuario }: { usuario: Colaborador }) {
-  const tarefas = useTasks();
+  // Pausada/Arquivada saem do Painel (mas continuam existindo — ver task-detail-sheet.tsx).
+  const tarefas = useTasks().filter(tarefaContaNoWorkload);
   const colaboradores = useColaboradores();
   // Garante que TaskExecutionList/AtividadesEntrandoEmBreve (que leem etapaById direto, sem
   // hook) re-renderizem assim que o catálogo de etapas hidratar — ver o comentário equivalente

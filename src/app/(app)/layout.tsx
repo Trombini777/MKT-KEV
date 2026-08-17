@@ -3,6 +3,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { AppTopbar } from "@/components/app-topbar";
 import { TaskDetailSheet } from "@/components/task-detail-sheet";
 import { CatalogoHydrator } from "@/components/catalogo-hydrator";
+import { AssistantOrb } from "@/components/assistant-orb";
 import { getUsuarioAtual } from "@/lib/usuario-atual";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -23,6 +24,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <Suspense>
         <TaskDetailSheet />
       </Suspense>
+      <AssistantOrb />
     </div>
   );
 }

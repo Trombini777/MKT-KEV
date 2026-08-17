@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { PriorityBadge } from "@/components/priority-badge";
 import { StatusProjetoBadge } from "@/components/status-projeto-badge";
+import { StatusAtividadeEditor } from "@/components/status-atividade-editor";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -38,6 +39,7 @@ import {
   adicionarLink,
   ajustarEtapaEmExecucao,
   atualizarPrazoTarefa,
+  atualizarStatusAtividade,
   ATENCAO_PREFIXO,
 } from "@/lib/task-store";
 import { useEtapas } from "@/lib/etapa-store";
@@ -334,6 +336,10 @@ export function TaskDetailSheet() {
             <PriorityBadge prioridade={tarefa.prioridadeFinal} />
             <span className="text-xs text-muted-foreground">{nomeTipo(tarefa.tipoId)}</span>
             <span className={cn("text-xs font-medium", corFaseAtual.text)}>· {fase?.nome}</span>
+            <StatusAtividadeEditor
+              status={tarefa.statusAtividade}
+              onChange={(novoStatus) => atualizarStatusAtividade(tarefa.id, novoStatus)}
+            />
 
             <div className="flex shrink-0 items-center gap-1.5">
               <Select

@@ -12,9 +12,11 @@ import {
   type ChecklistItem,
   type Comentario,
   type HistoricoEvento,
+  type StatusAtividade,
 } from "@/lib/mock";
 import { proximoDia, proximoDiaUtil } from "@/lib/scheduling";
 import { isoHoje, diasEntre, formatDataCompleta } from "@/lib/hoje";
+import { SELECT_TAREFA as SELECT, linhaParaTarefa } from "@/lib/tarefa-mapper";
 import { createClient } from "@/lib/supabase/client";
 import { obterColaboradorAtual } from "@/lib/current-colaborador-client";
 import { obterConfiguracoesFluxo } from "@/lib/configuracoes-fluxo";
@@ -29,112 +31,6 @@ const listeners = new Set<() => void>();
 
 function emit() {
   for (const listener of listeners) listener();
-}
-
-const SELECT = `
-  id, titulo, descricao, tipo_id, origem, solicitante_nome, solicitante_email, anexos, links,
-  justificativa_prioridade, justificativa_prazo, observacoes, quantidade_unidade, dados_completos,
-  tipo_solicitacao_geral, departamento, projeto_id, prioridade_sugerida, prioridade_final,
-  fase_atual_id, data_inicio, prazo, previsao_conclusao, executores_por_fase, estimativa_por_fase,
-  participantes_ids, tag_ids,
-  checklist_itens(id, texto, feito, criado_em),
-  comentarios(id, autor_id, texto, criado_em),
-  historico_eventos(id, data, autor_id, descricao, fase_id, acao),
-  planejamentos(gerado_em, previsao_conclusao, status, folga_dias, etapa_atual_ordem,
-    planejamento_etapas(id, etapa_id, ordem, colaborador_id, data_fim,
-      tempo_gasto_horas,
-      planejamento_alocacoes(data, horas)))
-`;
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function linhaParaTarefa(row: any): Tarefa {
-  const planejamentoRaw = Array.isArray(row.planejamentos) ? row.planejamentos[0] : row.planejamentos;
-  return {
-    id: row.id,
-    titulo: row.titulo,
-    descricao: row.descricao,
-    tipoId: row.tipo_id ?? undefined,
-    origem: row.origem,
-    solicitanteNome: row.solicitante_nome ?? undefined,
-    solicitanteEmail: row.solicitante_email ?? undefined,
-    anexos: row.anexos ?? [],
-    links: row.links ?? [],
-    justificativaPrioridade: row.justificativa_prioridade ?? undefined,
-    justificativaPrazo: row.justificativa_prazo ?? undefined,
-    observacoes: row.observacoes ?? undefined,
-    quantidadeUnidade: row.quantidade_unidade ?? undefined,
-    dadosCompletos: row.dados_completos ?? undefined,
-    tipoSolicitacaoGeral: row.tipo_solicitacao_geral ?? undefined,
-    departamento: row.departamento ?? undefined,
-    projetoId: row.projeto_id ?? undefined,
-    prioridadeSugerida: row.prioridade_sugerida ?? undefined,
-    prioridadeFinal: row.prioridade_final,
-    faseAtualId: row.fase_atual_id,
-    dataInicio: row.data_inicio,
-    prazo: row.prazo ?? "",
-    previsaoConclusao: row.previsao_conclusao ?? "",
-    executoresPorFase: row.executores_por_fase ?? {},
-    estimativaPorFase: row.estimativa_por_fase ?? {},
-    participantesIds: row.participantes_ids ?? [],
-    tagIds: row.tag_ids ?? [],
-    checklist: (row.checklist_itens ?? [])
-      .slice()
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .sort((a: any, b: any) => a.criado_em.localeCompare(b.criado_em))
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .map((c: any): ChecklistItem => ({ id: c.id, texto: c.texto, feito: c.feito })),
-    comentarios: (row.comentarios ?? [])
-      .slice()
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .sort((a: any, b: any) => a.criado_em.localeCompare(b.criado_em))
-      .map(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (c: any): Comentario => ({ id: c.id, autorId: c.autor_id, texto: c.texto, data: c.criado_em })
-      ),
-    historico: (row.historico_eventos ?? [])
-      .slice()
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .sort((a: any, b: any) => a.data.localeCompare(b.data))
-      .map(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (h: any): HistoricoEvento => ({
-          id: h.id,
-          data: h.data,
-          autorId: h.autor_id,
-          descricao: h.descricao,
-          faseId: h.fase_id ?? undefined,
-          acao: h.acao ?? undefined,
-        })
-      ),
-    planejamento: planejamentoRaw
-      ? {
-          geradoEm: planejamentoRaw.gerado_em,
-          etapas: (planejamentoRaw.planejamento_etapas ?? [])
-            .slice()
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .sort((a: any, b: any) => a.ordem - b.ordem)
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .map((e: any) => ({
-              id: e.id,
-              etapaId: e.etapa_id,
-              ordem: e.ordem,
-              colaboradorId: e.colaborador_id,
-              dataFim: e.data_fim,
-              tempoGastoHoras: e.tempo_gasto_horas ?? 0,
-              alocacoes: (e.planejamento_alocacoes ?? [])
-                .slice()
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                .sort((a: any, b: any) => a.data.localeCompare(b.data))
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                .map((a: any) => ({ data: a.data, horas: a.horas })),
-            })),
-          previsaoConclusao: planejamentoRaw.previsao_conclusao,
-          status: planejamentoRaw.status,
-          folgaDias: planejamentoRaw.folga_dias ?? undefined,
-          etapaAtualOrdem: planejamentoRaw.etapa_atual_ordem,
-        }
-      : undefined,
-  };
 }
 
 async function inserirHistorico(
@@ -516,6 +412,16 @@ export const CATEGORIA_PARA_FASE: Record<CategoriaEtapa, string> = {
   Concluído: "concluido",
 };
 
+/** Ao chegar na fase final do fluxo, o status da atividade vira "Concluída" automaticamente. */
+function colunasConclusao(novaFaseId: string, statusAtual: StatusAtividade) {
+  if (novaFaseId === "concluido") return { status: "Concluída" as const };
+  // Reabrir uma tarefa concluída (mover pra fora de "concluido") volta o status pra Ativa —
+  // sem isso ela ficaria com o badge "Concluída" numa fase que não é mais a final. Pausada e
+  // Arquivada são decisões manuais do usuário, então ficam como estão.
+  if (statusAtual === "Concluída") return { status: "Ativa" as const };
+  return {};
+}
+
 /**
  * Conclui a etapa atual do fluxo de trabalho (planejamento aplicado) e avança pra próxima —
  * `etapaAtualOrdem` passa de `maxOrdem` pra `maxOrdem + 1` ao concluir a última, sinalizando
@@ -556,7 +462,10 @@ export async function avancarEtapaPlanejamento(taskId: string) {
     return;
   }
   if (mudouFase) {
-    await supabase.from("tarefas").update({ fase_atual_id: novaFaseId }).eq("id", taskId);
+    await supabase
+      .from("tarefas")
+      .update({ fase_atual_id: novaFaseId, ...colunasConclusao(novaFaseId, t.statusAtividade) })
+      .eq("id", taskId);
   }
 
   const autor = await obterColaboradorAtual();
@@ -570,6 +479,7 @@ export async function avancarEtapaPlanejamento(taskId: string) {
       ? {
           ...x,
           faseAtualId: novaFaseId,
+          ...colunasConclusao(novaFaseId, t.statusAtividade),
           planejamento: { ...x.planejamento!, etapaAtualOrdem: novaOrdem },
           historico: [...x.historico, hist],
         }
@@ -836,8 +746,13 @@ export async function deslocarOcupacaoParaAjuste(
 }
 
 export async function moveTask(taskId: string, novaFaseId: string) {
+  const atual = tasks.find((x) => x.id === taskId);
+  if (!atual) return;
   const supabase = createClient();
-  const { error } = await supabase.from("tarefas").update({ fase_atual_id: novaFaseId }).eq("id", taskId);
+  const { error } = await supabase
+    .from("tarefas")
+    .update({ fase_atual_id: novaFaseId, ...colunasConclusao(novaFaseId, atual.statusAtividade) })
+    .eq("id", taskId);
   if (error) {
     console.error("Falha ao mover tarefa:", error.message);
     return;
@@ -846,7 +761,26 @@ export async function moveTask(taskId: string, novaFaseId: string) {
     faseId: novaFaseId,
   });
   tasks = tasks.map((t) =>
-    t.id === taskId ? { ...t, faseAtualId: novaFaseId, historico: [...t.historico, hist] } : t
+    t.id === taskId
+      ? { ...t, faseAtualId: novaFaseId, ...colunasConclusao(novaFaseId, t.statusAtividade), historico: [...t.historico, hist] }
+      : t
+  );
+  emit();
+}
+
+/** Muda o status manual da atividade (Ativa/Pausada/Concluída/Arquivada) — Pausada e Arquivada
+ * tiram a tarefa da contagem de Workload e Painel de Trabalho, sem apagar o registro. */
+export async function atualizarStatusAtividade(taskId: string, novoStatus: StatusAtividade) {
+  const supabase = createClient();
+  const { error } = await supabase.from("tarefas").update({ status: novoStatus }).eq("id", taskId);
+  if (error) {
+    console.error("Falha ao atualizar status da atividade:", error.message);
+    return;
+  }
+  const autor = await obterColaboradorAtual();
+  const hist = await inserirHistorico(supabase, taskId, `${autor?.nome ?? "Alguém"} mudou o status para ${novoStatus}`);
+  tasks = tasks.map((t) =>
+    t.id === taskId ? { ...t, statusAtividade: novoStatus, historico: [...t.historico, hist] } : t
   );
   emit();
 }

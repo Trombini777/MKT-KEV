@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PersonDayGrid } from "@/components/person-day-grid";
-import { gerarDias } from "@/lib/mock";
+import { gerarDias, tarefaContaNoWorkload } from "@/lib/mock";
 import { useTasks } from "@/lib/task-store";
 import { TABS_ATIVO_PRIMARY_CLASS } from "@/lib/utils";
 
@@ -20,7 +20,8 @@ export function WorkloadView({
 } = {}) {
   const [intervalo, setIntervalo] = useState("7");
   const dias = useMemo(() => gerarDias(new Date(), Number(intervalo)), [intervalo]);
-  const tarefas = useTasks();
+  const todasTarefas = useTasks();
+  const tarefas = useMemo(() => todasTarefas.filter(tarefaContaNoWorkload), [todasTarefas]);
 
   return (
     <div>

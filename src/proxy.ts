@@ -54,5 +54,10 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|icon.png).*)"],
+  matcher: [
+    "/((?!api|_next/static|_next/image|favicon.ico|icon.png|assistente-kev-light.png|assistente-kev-dark.png).*)",
+  ],
+  // ^ inclui assistente-kev-*.png pois o otimizador do next/image faz fetch interno do
+  // arquivo original, sem cookie de sessão — sem essa exceção, o guard bloqueia e a imagem
+  // "quebra" mesmo pro usuário logado.
 };
