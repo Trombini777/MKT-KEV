@@ -14,6 +14,8 @@ import { isoHoje, diasEntre } from "@/lib/hoje";
 import { formatarAgoraBrasil, dataCurtaBrasil } from "@/lib/kev-tempo";
 import { ehCargoDeGestao } from "@/lib/kev-cargo";
 import { carregarContextoAnteriorKev } from "@/lib/kev";
+import { buscarContextoTarefaFocada } from "@/lib/kev-tarefa";
+import { etapaAtualDe, ehMinhaAtividade } from "@/lib/tarefa-etapa";
 import { FASES } from "@/lib/mock/fluxo";
 import { SELECT_TAREFA, linhaParaTarefa } from "@/lib/tarefa-mapper";
 import {
@@ -35,7 +37,8 @@ function montarSystemPrompt(
   nome: string,
   cargo: string,
   memoria: string | null,
-  contextoAnterior: string | null
+  contextoAnterior: string | null,
+  contextoTarefaFocada: string | null
 ): string {
   const primeiroNome = nome.split(" ")[0];
   const fasesResumo = FASES.map((f) => f.nome).join(" -> ");
@@ -206,6 +209,11 @@ function montarSystemPrompt(
         ` mostra só o que foi dito hoje, mas você pode e deve referenciar isso quando fizer` +
         ` sentido, como alguém que lembra do que já foi falado):\n${contextoAnterior}`
       : ``,
+    contextoTarefaFocada
+      ? `\nCONTEXTO DA ATIVIDADE EM FOCO (${nome} está com o detalhe dessa tarefa aberto na tela` +
+        ` agora): use esses dados pra ajudar de verdade nas etapas dela quando ${nome} perguntar,` +
+        ` sem inventar nada que não esteja aqui:\n${contextoTarefaFocada}`
+      : ``,
   ].join("\n");
 }
 
@@ -242,10 +250,12 @@ export async function POST(req: Request) {
     return new Response("Corpo da requisição inválido.", { status: 400 });
   }
   const messages = validado.data;
+  const tarefaFocadaId = (corpo as { tarefaFocadaId?: unknown } | null)?.tarefaFocadaId;
 
-  const [{ data: memoriaRow }, contextoAnterior] = await Promise.all([
+  const [{ data: memoriaRow }, contextoAnterior, contextoTarefaFocada] = await Promise.all([
     supabase.from("kev_memoria").select("notas").eq("colaborador_id", usuario.id).maybeSingle(),
     carregarContextoAnteriorKev(),
+    typeof tarefaFocadaId === "string" && tarefaFocadaId ? buscarContextoTarefaFocada(tarefaFocadaId) : null,
   ]);
 
   // Persiste a mensagem do usuário (a última do array — o histórico anterior já foi salvo em
@@ -287,36 +297,11 @@ export async function POST(req: Request) {
 
   const nomeProjeto = (p: TarefaRow["projeto"]) => (Array.isArray(p) ? p[0]?.nome : p?.nome);
 
-  /**
-   * "Prazo final da tarefa" (tarefas.prazo) e "prazo da etapa atual" (o que a UI mostra como
-   * "Executar etapa até") são datas diferentes — uma tarefa pode ter o prazo final só daqui a
-   * semanas, mas a etapa em que ela está agora vencer hoje. As duas importam.
-   *
-   * O responsável de verdade pela etapa atual é `planejamento_etapas.colaborador_id` (quando há
-   * planejamento aplicado), não o campo legado `executores_por_fase` — uma tarefa pode não ter
-   * o usuário em `executoresPorFase` e ainda assim estar na mão dele agora via planejamento.
-   */
-  function etapaAtualDe(t: TarefaRow) {
-    const planejamento = Array.isArray(t.planejamento) ? t.planejamento[0] : t.planejamento;
-    const atual = planejamento?.etapas?.find((e) => e.ordem === planejamento.etapaAtualOrdem);
-    const esforcoHoras = atual?.alocacoes?.length
-      ? atual.alocacoes.reduce((soma, a) => soma + a.horas, 0)
-      : undefined;
-    return {
-      etapaId: atual?.etapaId ?? null,
-      dataFim: atual?.dataFim ?? null,
-      colaboradorId: atual?.colaboradorId ?? null,
-      esforcoHoras,
-    };
-  }
-
-  /** É "minha" se eu sou o responsável da etapa atual (planejamento) OU estou no campo legado. */
-  function ehMinhaAtividade(t: TarefaRow, usuarioId: string): boolean {
-    if (etapaAtualDe(t).colaboradorId === usuarioId) return true;
-    const executores = t.executoresPorFase?.[t.faseAtualId] ?? [];
-    const participantes = t.participantesIds ?? [];
-    return executores.includes(usuarioId) || participantes.includes(usuarioId);
-  }
+  // "Prazo final da tarefa" (tarefas.prazo) e "prazo da etapa atual" (o que a UI mostra como
+  // "Executar etapa até") são datas diferentes — uma tarefa pode ter o prazo final só daqui a
+  // semanas, mas a etapa em que ela está agora vencer hoje. As duas importam.
+  // etapaAtualDe/ehMinhaAtividade vêm de @/lib/tarefa-etapa (compartilhado com o convite
+  // proativo de tarefa em kev-tarefa.ts).
 
   // Carrega as tarefas na MESMA forma que a UI (via tarefa-mapper), pra que os cálculos de
   // atividades futuras e carga por dia batam exatamente com o que as telas mostram. Pausada/
@@ -329,7 +314,13 @@ export async function POST(req: Request) {
 
   const result = streamText({
     model: openai("gpt-5.4-mini"),
-    system: montarSystemPrompt(usuario.nome, usuario.cargo, memoriaRow?.notas || null, contextoAnterior),
+    system: montarSystemPrompt(
+      usuario.nome,
+      usuario.cargo,
+      memoriaRow?.notas || null,
+      contextoAnterior,
+      contextoTarefaFocada
+    ),
     messages: await convertToModelMessages(messages),
     // 8 (não 5): perguntas amplas encadeiam até 3 ferramentas (buscarAtividades,
     // buscarAtividadesFuturas, buscarCargaPorDia) antes da resposta final.

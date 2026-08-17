@@ -24,7 +24,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <Suspense>
         <TaskDetailSheet />
       </Suspense>
-      <AssistantOrb />
+      <Suspense>
+        <AssistantOrb />
+      </Suspense>
     </div>
   );
 }

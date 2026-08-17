@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getUsuarioAtual } from "@/lib/usuario-atual";
 import { formatarAgoraBrasil, inicioDoDiaBrasilISO } from "@/lib/kev-tempo";
 import { ehCargoDeGestao } from "@/lib/kev-cargo";
+import { REGRAS_ESTILO } from "@/lib/kev-estilo";
 
 export type KevMensagemHistorico = {
   id: string;
@@ -15,14 +16,6 @@ export type KevMensagemHistorico = {
 
 const LIMITE_HISTORICO = 40;
 const LIMITE_CONTEXTO_ANTERIOR = 20;
-
-const REGRAS_ESTILO =
-  `Regras de estilo, sem exceção:\n` +
-  `- Não use travessão (—) em nenhuma frase.\n` +
-  `- Não ofereça duas leituras com "ou" nas frases de afirmação (nada de "X ou talvez Y").` +
-  ` Escolha UMA leitura do momento e comprometa-se com ela em frases curtas e declarativas.\n` +
-  `- Escreva em parágrafos bem curtos (1 frase cada, no máximo 2), separados por uma linha em` +
-  ` branco entre eles, como alguém mandando algumas mensagens curtas seguidas numa conversa de texto.`;
 
 /**
  * Mensagens de HOJE (fuso de Brasília) do usuário logado com o keV — é o que aparece na tela.

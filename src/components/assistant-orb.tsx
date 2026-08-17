@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import { useSearchParams } from "next/navigation";
 import { useChat } from "@ai-sdk/react";
 import type { UIMessage } from "ai";
 import { Send, X } from "lucide-react";
@@ -14,6 +15,7 @@ import {
   obterSugestoesKev,
   type SugestaoKev,
 } from "@/lib/kev";
+import { avaliarConviteTarefaKev } from "@/lib/kev-tarefa";
 
 // Comando de manutenção (não exposto na UI): apaga de verdade o histórico salvo em
 // kev_mensagens, diferente do botão "Nova conversa" (que só reinicia a tela).
@@ -122,6 +124,27 @@ export function AssistantOrb() {
   const inputRef = useRef<HTMLInputElement>(null);
   const fimRef = useRef<HTMLDivElement>(null);
 
+  // Tarefa aberta agora no detalhe (?tarefa=<id>, mesma fonte que task-detail-sheet.tsx usa) —
+  // enquanto setada, toda mensagem enviada ao keV leva o contexto completo dessa tarefa (ver
+  // enviar()). Também dispara o convite proativo abaixo quando muda pra uma tarefa nova.
+  const tarefaFocadaId = useSearchParams().get("tarefa");
+
+  // Refs pra ler o estado mais recente de dentro do .then() do convite proativo sem precisar
+  // colocar `aberto`/`decisaoPendente` nas deps do efeito (que só deve rodar quando a tarefa muda).
+  const abertoRef = useRef(aberto);
+  useEffect(() => {
+    abertoRef.current = aberto;
+  }, [aberto]);
+  const decisaoPendenteRef = useRef(decisaoPendente);
+  useEffect(() => {
+    decisaoPendenteRef.current = decisaoPendente;
+  }, [decisaoPendente]);
+
+  // Setado logo antes de abrir o painel pelo convite proativo de tarefa — avisa o efeito abaixo
+  // (que normalmente pede a decisão continuar/nova sempre que o painel abre) pra não sobrescrever
+  // a conversa já carregada pelo convite.
+  const abrindoPorConviteRef = useRef(false);
+
   // Posição salva do botão arrastável (ou canto inferior direito, se nunca movido). Recalcula os
   // limites quando a janela muda de tamanho, pra não deixar o botão preso fora da tela.
   useEffect(() => {
@@ -181,9 +204,15 @@ export function AssistantOrb() {
     [posicao]
   );
 
-  // Toda vez que o painel abre, volta a pedir a decisão (continuar/nova conversa).
+  // Toda vez que o painel abre, volta a pedir a decisão (continuar/nova conversa) — exceto quando
+  // foi o convite proativo de tarefa que abriu o painel (ele já decide "continuar" sozinho).
   useEffect(() => {
-    if (aberto) Promise.resolve().then(() => setDecisaoPendente(true));
+    if (!aberto) return;
+    if (abrindoPorConviteRef.current) {
+      abrindoPorConviteRef.current = false;
+      return;
+    }
+    Promise.resolve().then(() => setDecisaoPendente(true));
   }, [aberto]);
 
   // "Continuar conversa" — carrega o histórico de hoje; se ainda não tiver nenhuma mensagem hoje,
@@ -253,6 +282,38 @@ export function AssistantOrb() {
     }
   }, [setMessages]);
 
+  // Convite proativo: sempre que o id da tarefa aberta na URL muda pra um valor novo, pergunta ao
+  // servidor se essa é a vez do usuário agir nela (etapa atual dele) e se ainda não foi convidado
+  // nessa etapa. Painel fechado (ou ainda na tela de decisão) -> abre e carrega a conversa de hoje
+  // (que já termina com o convite, inserido no servidor). Painel já em conversa -> só acrescenta a
+  // mensagem do convite, sem mexer no que já estava sendo falado.
+  useEffect(() => {
+    if (!tarefaFocadaId) return;
+    let cancelado = false;
+    avaliarConviteTarefaKev(tarefaFocadaId).then((resultado) => {
+      if (cancelado || !resultado.elegivel || resultado.jaConvidado) return;
+      const novaMensagem: UIMessage = {
+        id: resultado.mensagem.id,
+        role: "assistant",
+        parts: [{ type: "text", text: resultado.mensagem.texto }],
+      };
+      if (abertoRef.current && !decisaoPendenteRef.current) {
+        setMessages((atuais) => [...atuais, novaMensagem]);
+      } else {
+        if (!abertoRef.current) abrindoPorConviteRef.current = true;
+        setAberto(true);
+        continuarConversa();
+      }
+    }).catch((erro) => {
+      // Convite proativo é um "a mais", não uma ação que o usuário pediu agora — falha aqui não
+      // deve abrir o painel só pra mostrar um erro. Só registra pra investigação.
+      if (!cancelado) console.error("Falha ao avaliar convite de tarefa do keV:", erro);
+    });
+    return () => {
+      cancelado = true;
+    };
+  }, [tarefaFocadaId, continuarConversa, setMessages]);
+
   // Foco no input ao abrir.
   useEffect(() => {
     if (!aberto) return;
@@ -286,9 +347,9 @@ export function AssistantOrb() {
         return;
       }
 
-      sendMessage({ text: conteudo });
+      sendMessage({ text: conteudo }, tarefaFocadaId ? { body: { tarefaFocadaId } } : undefined);
     },
-    [texto, digitando, sendMessage, apagarHistoricoCompleto]
+    [texto, digitando, sendMessage, apagarHistoricoCompleto, tarefaFocadaId]
   );
 
   // Atalhos somem depois da primeira pergunta do usuário, pra não poluir a conversa.
