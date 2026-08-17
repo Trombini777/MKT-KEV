@@ -45,9 +45,14 @@ export function LoginForm() {
         />
       </div>
       <div className="flex flex-col gap-2">
-        <Label htmlFor="password" className={FIELD_LABEL_CLASS}>
-          Senha
-        </Label>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="password" className={FIELD_LABEL_CLASS}>
+            Senha
+          </Label>
+          <a href="/esqueci-senha" className="text-xs text-muted-foreground hover:text-foreground">
+            Esqueci minha senha
+          </a>
+        </div>
         <Input
           id="password"
           name="password"

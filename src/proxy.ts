@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-const ROTAS_PUBLICAS = ["/login", "/solicitacoes"];
+const ROTAS_PUBLICAS = ["/login", "/solicitacoes", "/esqueci-senha", "/reset-senha"];
 
 function ehRotaPublica(pathname: string): boolean {
   if (pathname === "/") return true;
