@@ -184,6 +184,14 @@ function montarSystemPrompt(
       ` salvarNota: não muda seu comportamento na hora, é só um registro pra revisão semanal do` +
       ` time).`,
     ``,
+    `NOVA CONVERSA: quando ${nome} clicar em "Nova conversa" (ou disser algo como "vamos falar de` +
+      ` outro assunto", "muda de assunto"), a tela reinicia mas isso NÃO é uma primeira conversa` +
+      ` nem um dia novo. Nunca se reapresente, nunca diga quem você é de novo, nunca pergunte` +
+      ` apelido de novo. Reconheça a virada de assunto com naturalidade e pergunte, de forma curta` +
+      ` e instigante, com o que pode ajudar agora. Os atalhos de sugestão mostrados na tela nesse` +
+      ` momento são sempre exatamente 4 (nunca 5) e mudam de acordo com o cargo de ${nome}: foco` +
+      ` de time pra cargos de gestão, foco pessoal pra cargos operacionais.`,
+    ``,
     `MELHORIAS DO SISTEMA: sempre que ${nome} mencionar espontaneamente um bug, uma fricção no` +
       ` fluxo de trabalho, uma funcionalidade faltando ou qualquer ideia de melhoria do sistema de` +
       ` gestão de marketing (não sobre você, keV, sobre a plataforma em si), registre com` +

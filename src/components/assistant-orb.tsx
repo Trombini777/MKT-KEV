@@ -6,9 +6,18 @@ import { useChat } from "@ai-sdk/react";
 import type { UIMessage } from "ai";
 import { Send, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { apagarConversaKev, carregarHistoricoKev, gerarSaudacaoKev } from "@/lib/kev";
+import {
+  apagarConversaKev,
+  carregarHistoricoKev,
+  gerarMensagemNovaConversa,
+  gerarSaudacaoKev,
+  obterSugestoesKev,
+  type SugestaoKev,
+} from "@/lib/kev";
 
-const COMANDO_LIMPAR_CONVERSA = "/deleteconversa";
+// Comando de manutenção (não exposto na UI): apaga de verdade o histórico salvo em
+// kev_mensagens, diferente do botão "Nova conversa" (que só reinicia a tela).
+const COMANDO_APAGAR_HISTORICO = "/apagarhistorico";
 
 const MENSAGEM_ERRO_CARREGAMENTO: UIMessage = {
   id: "erro-carregamento",
@@ -26,13 +35,6 @@ const MASCOTE_DARK_SRC = "/assistente-kev-dark.png";
  * especificamente no breakpoint de 64px, descartando a transparência do PNG original —
  * então serve o arquivo local direto, sem passar pelo otimizador.
  */
-const SUGESTOES = [
-  { label: "O que olho primeiro hoje?", mensagem: "O que eu preciso olhar primeiro hoje?" },
-  { label: "Atividades atrasadas", mensagem: "Quais das minhas atividades estão atrasadas?" },
-  { label: "Aprovações pendentes", mensagem: "O que está aguardando minha aprovação?" },
-  { label: "Carga da equipe", mensagem: "Quem está mais sobrecarregado no time agora?" },
-  { label: "Conhecer o sistema", mensagem: "Me explica como esse sistema funciona e como ele pode me ajudar." },
-];
 
 type Posicao = { x: number; y: number };
 
@@ -110,6 +112,9 @@ export function AssistantOrb() {
   // Toda vez que o chat é reaberto, pergunta se é pra continuar de onde parou ou começar do zero
   // (ver `continuarConversa`/`novaConversa`) — só depois de escolher é que mensagens/input aparecem.
   const [decisaoPendente, setDecisaoPendente] = useState(true);
+  // Atalhos de sugestão: sempre 4, variam por cargo (ver obterSugestoesKev) — carregados junto
+  // com a mensagem de abertura, tanto em "Continuar conversa" quanto em "Nova conversa".
+  const [sugestoes, setSugestoes] = useState<SugestaoKev[]>([]);
 
   const { messages, sendMessage, status, error, setMessages } = useChat();
   const digitando = status === "submitted" || status === "streaming" || limpando;
@@ -187,7 +192,8 @@ export function AssistantOrb() {
     setDecisaoPendente(false);
     setLimpando(true);
     try {
-      const historico = await carregarHistoricoKev();
+      const [historico, novasSugestoes] = await Promise.all([carregarHistoricoKev(), obterSugestoesKev()]);
+      setSugestoes(novasSugestoes);
       if (historico.length > 0) {
         setMessages(
           historico.map((m) => ({ id: m.id, role: m.role, parts: [{ type: "text", text: m.texto }] }))
@@ -205,15 +211,38 @@ export function AssistantOrb() {
     }
   }, [setMessages]);
 
-  // "Nova conversa" (e comando /deleteconversa) — apaga todo o histórico salvo e recomeça do
-  // zero, como se fosse a primeira conversa.
+  // "Nova conversa" — limpa só a TELA, como se fosse assunto novo. O histórico em kev_mensagens
+  // não é apagado: o keV não se reapresenta, só reconhece a virada de assunto e pergunta o que
+  // vem a seguir (ver gerarMensagemNovaConversa).
   const novaConversa = useCallback(async () => {
     setDecisaoPendente(false);
     setLimpando(true);
     setMessages([]);
     try {
+      const [mensagem, novasSugestoes] = await Promise.all([
+        gerarMensagemNovaConversa(),
+        obterSugestoesKev(),
+      ]);
+      setSugestoes(novasSugestoes);
+      if (mensagem) {
+        setMessages([{ id: mensagem.id, role: "assistant", parts: [{ type: "text", text: mensagem.texto }] }]);
+      }
+    } catch {
+      setMessages([MENSAGEM_ERRO_CARREGAMENTO]);
+    } finally {
+      setLimpando(false);
+    }
+  }, [setMessages]);
+
+  // Comando de manutenção /apagarhistorico — apaga de verdade o histórico salvo e recomeça do
+  // zero, como se fosse a primeira conversa (diferente de "Nova conversa", que preserva o back-end).
+  const apagarHistoricoCompleto = useCallback(async () => {
+    setLimpando(true);
+    setMessages([]);
+    try {
       await apagarConversaKev();
-      const saudacao = await gerarSaudacaoKev();
+      const [saudacao, novasSugestoes] = await Promise.all([gerarSaudacaoKev(), obterSugestoesKev()]);
+      setSugestoes(novasSugestoes);
       if (saudacao) {
         setMessages([{ id: saudacao.id, role: "assistant", parts: [{ type: "text", text: saudacao.texto }] }]);
       }
@@ -252,14 +281,14 @@ export function AssistantOrb() {
       if (!conteudo || digitando) return;
       setTexto("");
 
-      if (conteudo.toLowerCase() === COMANDO_LIMPAR_CONVERSA) {
-        novaConversa();
+      if (conteudo.toLowerCase() === COMANDO_APAGAR_HISTORICO) {
+        apagarHistoricoCompleto();
         return;
       }
 
       sendMessage({ text: conteudo });
     },
-    [texto, digitando, sendMessage, novaConversa]
+    [texto, digitando, sendMessage, apagarHistoricoCompleto]
   );
 
   // Atalhos somem depois da primeira pergunta do usuário, pra não poluir a conversa.
@@ -394,7 +423,7 @@ export function AssistantOrb() {
           <div className="border-t border-border/60 p-3">
             {mostrarSugestoes && (
               <div className="mb-2 flex flex-wrap gap-1.5">
-                {SUGESTOES.map((s) => (
+                {sugestoes.map((s) => (
                   <button
                     key={s.label}
                     type="button"

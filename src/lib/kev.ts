@@ -72,13 +72,77 @@ export async function carregarContextoAnteriorKev(): Promise<string | null> {
     .join("\n");
 }
 
-/** Apaga todo o histórico de conversa do usuário logado com o keV (comando `/deleteconversa`). */
+/** Apaga todo o histórico de conversa do usuário logado com o keV (uso administrativo). */
 export async function apagarConversaKev(): Promise<void> {
   const usuario = await getUsuarioAtual();
   if (!usuario) return;
 
   const supabase = await createClient();
   await supabase.from("kev_mensagens").delete().eq("colaborador_id", usuario.id);
+}
+
+export type SugestaoKev = { label: string; mensagem: string };
+
+const SUGESTOES_GESTAO: SugestaoKev[] = [
+  { label: "O que olho primeiro hoje?", mensagem: "O que eu preciso olhar primeiro hoje?" },
+  { label: "Carga da equipe", mensagem: "Quem está mais sobrecarregado no time agora?" },
+  { label: "Atrasos do time", mensagem: "Quais atividades do time estão atrasadas?" },
+  { label: "Aprovações da equipe", mensagem: "O que está aguardando aprovação na equipe?" },
+];
+
+const SUGESTOES_OPERACIONAL: SugestaoKev[] = [
+  { label: "O que olho primeiro hoje?", mensagem: "O que eu preciso olhar primeiro hoje?" },
+  { label: "Minhas atividades atrasadas", mensagem: "Quais das minhas atividades estão atrasadas?" },
+  { label: "Aprovações pendentes", mensagem: "O que está aguardando minha aprovação?" },
+  { label: "Conhecer o sistema", mensagem: "Me explica como esse sistema funciona e como ele pode me ajudar." },
+];
+
+/**
+ * Sempre 4 atalhos (nunca 5), diferentes por cargo: gestão vê atalhos de time, operacional vê
+ * atalhos pessoais. Usado tanto na primeira conversa quanto em toda vez que a tela reinicia
+ * (saudação diária, "Nova conversa").
+ */
+export async function obterSugestoesKev(): Promise<SugestaoKev[]> {
+  const usuario = await getUsuarioAtual();
+  if (!usuario) return SUGESTOES_OPERACIONAL;
+  return ehCargoDeGestao(usuario.cargo) ? SUGESTOES_GESTAO : SUGESTOES_OPERACIONAL;
+}
+
+/**
+ * "Nova conversa" no meio do dia: a pessoa quer mudar de assunto, não começar do zero de verdade.
+ * A TELA reinicia (ver `novaConversa` em assistant-orb.tsx), mas o histórico em `kev_mensagens`
+ * continua intacto, e essa mensagem entra nele como qualquer outra — não é uma re-apresentação,
+ * é só o keV reconhecendo a virada de assunto e perguntando o que vem a seguir.
+ */
+export async function gerarMensagemNovaConversa(): Promise<KevMensagemHistorico | null> {
+  const usuario = await getUsuarioAtual();
+  if (!usuario) return null;
+
+  const primeiroNome = usuario.nome.split(" ")[0];
+  const { text } = await generateText({
+    model: openai("gpt-5.4-mini"),
+    system:
+      `Você é o keV, assistente pessoal de trabalho de ${primeiroNome} na Kev Seguros, que já` +
+      ` conversa com ele(a) há um tempo. Tom: calmo, caloroso, direto, genuinamente curioso.`,
+    prompt:
+      `${primeiroNome} acabou de clicar em "Nova conversa" no meio do dia, sinalizando que quer` +
+      ` mudar de assunto. Isso NÃO é a primeira conversa nem um dia novo: não se apresente de` +
+      ` novo, não diga quem você é, não pergunte apelido, não comente o horário ou o dia. Escreva` +
+      ` só uma pergunta curta e instigante perguntando com o que pode ajudar agora, de um jeito que` +
+      ` soe genuinamente interessado, não burocrático nem repetitivo. Não use literalmente "Com` +
+      ` que posso te ajudar agora?", varie a forma.\n\n` +
+      `${REGRAS_ESTILO}\n\n` +
+      `Máximo uma frase curta. Português do Brasil.`,
+  });
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("kev_mensagens")
+    .insert({ colaborador_id: usuario.id, papel: "assistant", conteudo: text })
+    .select("id")
+    .single();
+
+  return { id: data?.id ?? crypto.randomUUID(), role: "assistant", texto: text };
 }
 
 /**
