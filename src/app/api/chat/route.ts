@@ -134,7 +134,10 @@ function montarSystemPrompt(
       ` diga por que isso importa e o que fazer primeiro: qual delas bloqueia outra coisa, qual é` +
       ` mais crítica, por onde ele deveria começar. Use as ferramentas disponíveis para consultar` +
       ` dados reais antes de responder sobre atividades, projetos ou carga da equipe, inclusive` +
-      ` quando a pergunta for sobre outra pessoa ou sobre o time todo, não só sobre ${nome}.`,
+      ` quando a pergunta for sobre outra pessoa ou sobre o time todo, não só sobre ${nome}.` +
+      ` "Workload"/carga da equipe SEMPRE significa horas alocadas por dia (buscarWorkloadEquipe) —` +
+      ` nunca responda isso contando quantidade de atividades; se não tiver certeza do que foi` +
+      ` pedido, prefira a visão de horas, que é a mesma grade pessoa x dia da aba Workload.`,
     `Ao avaliar prazo ou atraso de uma atividade, sempre considere as duas datas retornadas por` +
       ` buscarAtividades: o prazo final da tarefa E o prazo da etapa atual. Uma tarefa pode ter o` +
       ` prazo final tranquilo mas a etapa em que está agora vencendo hoje, ou vice-versa. Quando as` +
@@ -477,40 +480,48 @@ export async function POST(req: Request) {
           }));
         },
       }),
-      buscarCargaEquipe: tool({
+      buscarWorkloadEquipe: tool({
         description:
-          "Mostra quantas atividades ativas cada pessoa do time tem agora. Use para responder " +
-          "perguntas sobre quem está mais sobrecarregado ou com mais folga na equipe.",
-        inputSchema: z.object({}),
-        execute: async () => {
-          const [{ data: tarefas }, { data: colaboradores }] = await Promise.all([
-            supabase
-              .from("tarefas")
-              .select(
-                "faseAtualId:fase_atual_id, executoresPorFase:executores_por_fase," +
-                  " participantesIds:participantes_ids, planejamento:planejamentos(" +
-                  "etapaAtualOrdem:etapa_atual_ordem, etapas:planejamento_etapas(ordem," +
-                  " colaboradorId:colaborador_id))"
-              )
-              .neq("fase_atual_id", "concluido")
-              .not("status", "in", '("Pausada","Arquivada")'),
+          "Grade de HORAS alocadas por dia de CADA pessoa ativa do time, com a capacidade diária" +
+          " de cada um e o status do dia (livre/tranquilo/cheio/estourado) — a mesma grade" +
+          " pessoa x dia da aba Workload em Gestão de Tarefas. Use sempre que a pergunta for" +
+          " sobre o workload/carga da equipe toda ou de mais de uma pessoa (não é contagem de" +
+          " atividades, é tempo real alocado). Pra carga só do usuário logado, use" +
+          " buscarCargaPorDia.",
+        inputSchema: z.object({
+          dias: z
+            .number()
+            .int()
+            .min(1)
+            .max(30)
+            .default(7)
+            .describe("Quantos dias à frente considerar, a partir de hoje. Default 7 (a semana)."),
+        }),
+        execute: async ({ dias }) => {
+          const [tarefas, { data: colaboradores }] = await Promise.all([
+            carregarTarefas(),
             supabase.from("colaboradores").select("id, nome").eq("status", "Ativo"),
           ]);
+          const STATUS: Record<string, string> = {
+            off: "livre",
+            good: "tranquilo",
+            warn: "cheio",
+            crit: "estourado",
+          };
+          const gradeDias = gerarDias(new Date(), dias);
 
-          const contagem = new Map<string, number>();
-          for (const t of (tarefas ?? []) as unknown as TarefaRow[]) {
-            const responsavelEtapaAtual = etapaAtualDe(t).colaboradorId;
-            const envolvidos = new Set<string>([
-              ...(t.executoresPorFase?.[t.faseAtualId] ?? []),
-              ...(t.participantesIds ?? []),
-              ...(responsavelEtapaAtual ? [responsavelEtapaAtual] : []),
-            ]);
-            for (const id of envolvidos) contagem.set(id, (contagem.get(id) ?? 0) + 1);
-          }
-
-          return (colaboradores ?? [])
-            .map((c) => ({ nome: c.nome, atividadesAtivas: contagem.get(c.id) ?? 0 }))
-            .sort((a, b) => b.atividadesAtivas - a.atividadesAtivas);
+          return (colaboradores ?? []).map((c) => {
+            const capacidade = capacidadeDiaria(c.id);
+            const porDia = gradeDias.map((d) => {
+              const horas = d.fimDeSemana ? 0 : horasAlocadasPorDia(c.id, d.iso, {}, tarefas);
+              const status = d.fimDeSemana ? "fim-de-semana" : STATUS[nivelCarga(horas, capacidade)];
+              return { data: d.iso, diaSemana: d.label, horas: Math.round(horas * 10) / 10, status };
+            });
+            const totalHorasNoPeriodo = Math.round(
+              porDia.reduce((soma, d) => soma + d.horas, 0) * 10
+            ) / 10;
+            return { nome: c.nome, capacidadeDiariaHoras: capacidade, totalHorasNoPeriodo, dias: porDia };
+          });
         },
       }),
       buscarAtividadesFuturas: tool({

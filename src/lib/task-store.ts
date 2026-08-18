@@ -103,7 +103,7 @@ async function substituirAlocacoesDaEtapa(
 
 /**
  * Se `ordem` for a etapa ATUAL da tarefa, calcula `executoresPorFase[faseAtualId]` já sincronizado
- * com o novo executor — campo legado usado pela tool buscarCargaEquipe do keV pra contar carga do
+ * com o novo executor — campo legado usado pela tool buscarWorkloadEquipe do keV pra contar carga do
  * time; sem essa sincronização, a pessoa antiga continua "contando" na fase mesmo depois de
  * substituída na etapa de verdade. Reatribuir uma etapa FUTURA não muda quem está de fato
  * trabalhando na fase agora, então devolve o mesmo `executoresPorFase` de antes, sem tocar em
@@ -1118,7 +1118,7 @@ export async function replanejarEtapasDaAtividade(
     novasEtapas[0].dataFim
   );
 
-  // executoresPorFase (campo legado, usado por buscarCargaEquipe do keV) só reflete a etapa
+  // executoresPorFase (campo legado, usado por buscarWorkloadEquipe do keV) só reflete a etapa
   // ATUAL — reatribuir uma etapa futura não muda quem está de fato trabalhando na fase agora.
   const etapaAtualEditada = etapasSalvas.find((e) => e.ordem === t.planejamento!.etapaAtualOrdem);
   const novoExecutoresPorFase = etapaAtualEditada

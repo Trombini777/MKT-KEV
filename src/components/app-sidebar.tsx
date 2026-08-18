@@ -67,7 +67,12 @@ export function AppSidebar() {
           </div>
         ))}
 
-        <NotasPessoaisSidebar />
+        <div className="flex flex-col gap-1">
+          <p className="px-2.5 text-[0.68rem] font-semibold tracking-wider text-muted-foreground/80 uppercase">
+            Pessoal
+          </p>
+          <NotasPessoaisSidebar />
+        </div>
       </nav>
     </aside>
   );
