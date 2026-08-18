@@ -28,7 +28,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useDepartamentos } from "@/lib/departamentos-store";
 import { createClient } from "@/lib/supabase/client";
 import { obterColaboradorAtual } from "@/lib/current-colaborador-client";
-import { recarregarTarefas } from "@/lib/task-store";
+import { recarregarTarefas, vincularProjeto } from "@/lib/task-store";
 import { anoDoPrazoValido, MENSAGEM_ANO_INVALIDO } from "@/lib/validacao-data";
 import type { PrioridadeSugerida } from "@/lib/mock";
 
@@ -71,7 +71,17 @@ function CampoErro({ mensagem }: { mensagem?: string }) {
  * da sessão em vez de perguntados, e o formulário fica só com o essencial (sem justificativas —
  * isso é pra quando o pedido é externo e precisa se explicar pro time).
  */
-export function NovaAtividadeDialog({ onCriada }: { onCriada?: () => void }) {
+export function NovaAtividadeDialog({
+  onCriada,
+  projetoId,
+  projetoNome,
+}: {
+  onCriada?: () => void;
+  /** Quando presente (ex.: aberto a partir de "Tarefas do projeto"), a atividade já nasce
+   * vinculada a esse projeto/campanha, em vez de precisar vincular depois manualmente. */
+  projetoId?: string;
+  projetoNome?: string;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -139,7 +149,10 @@ export function NovaAtividadeDialog({ onCriada }: { onCriada?: () => void }) {
       return;
     }
 
+    // recarregarTarefas ANTES de vincularProjeto: essa função só age sobre tarefa que já está no
+    // estado local (`tasks.find`), e a recém-criada só existe ali depois de recarregar do banco.
     await recarregarTarefas();
+    if (projetoId) await vincularProjeto(novaTarefaId, projetoId, projetoNome ?? "");
     setIsSubmitting(false);
     setOpen(false);
     onCriada?.();

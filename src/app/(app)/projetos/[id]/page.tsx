@@ -16,10 +16,11 @@ import {
 } from "@/components/ui/select";
 import { TaskListRow } from "@/components/task-list-row";
 import { StatusProjetoEditor } from "@/components/status-projeto-editor";
+import { NovaAtividadeDialog } from "@/components/nova-atividade-dialog";
 import { colaboradorById, horasEstimadasTarefa, type StatusProjeto } from "@/lib/mock";
 import { useProjetos, useProjetosCarregados, editarProjeto } from "@/lib/projeto-store";
 import { useColaboradores } from "@/lib/colaborador-store";
-import { useTasks } from "@/lib/task-store";
+import { useTasks, recarregarTarefas } from "@/lib/task-store";
 import { isoHoje } from "@/lib/hoje";
 import { decimalParaHorario } from "@/lib/time-format";
 import { ChevronLeft } from "lucide-react";
@@ -151,7 +152,14 @@ export default function ProjetoDetalhePage() {
       </Card>
 
       <section className="mt-6">
-        <h2 className="mb-2 text-sm font-semibold">Tarefas do projeto</h2>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold">Tarefas do projeto</h2>
+          <NovaAtividadeDialog
+            projetoId={projeto.id}
+            projetoNome={projeto.nome}
+            onCriada={recarregarTarefas}
+          />
+        </div>
         <Card>
           <CardContent className="divide-y divide-border/60 py-1">
             {tarefas.length === 0 && (
