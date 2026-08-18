@@ -1,7 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard,
-  CalendarClock,
   Columns3,
   FolderKanban,
   Megaphone,
@@ -28,7 +27,6 @@ export const NAV_SECTIONS: NavSection[] = [
     title: "Trabalho",
     items: [
       { href: "/painel", label: "Painel de Trabalho", icon: LayoutDashboard },
-      { href: "/planejamento-semanal", label: "Planejamento Semanal", icon: CalendarClock },
       { href: "/visualizacoes", label: "Gestão de Tarefas", icon: Columns3 },
     ],
   },
