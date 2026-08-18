@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { KevLogo } from "@/components/kev-logo";
+import { NotasPessoaisSidebar } from "@/components/notas-pessoais-sidebar";
 import { NAV_SECTIONS } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 import { useTasks } from "@/lib/task-store";
@@ -65,6 +66,8 @@ export function AppSidebar() {
             })}
           </div>
         ))}
+
+        <NotasPessoaisSidebar />
       </nav>
     </aside>
   );
