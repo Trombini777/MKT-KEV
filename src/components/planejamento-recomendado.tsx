@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Calendar, Check, Maximize2, X } from "lucide-react";
 import { ColaboradorAvatar } from "@/components/colaborador-avatar";
 import {
@@ -22,11 +22,21 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { useTasks, aplicarPlanejamento, atualizarPrazoTarefa, moveTask } from "@/lib/task-store";
+import {
+  useTasks,
+  aplicarPlanejamento,
+  atualizarPrazoTarefa,
+  moveTask,
+  replanejarEtapasDaAtividade,
+} from "@/lib/task-store";
 import { anoDoPrazoValido, MENSAGEM_ANO_INVALIDO } from "@/lib/validacao-data";
 import {
   calcularPlanejamentoSimples,
   classificarStatus,
+  distribuirHorasPorDia,
+  foraDeOrdemCronologica,
+  passosUteisEntre,
+  proximoDiaUtil,
   type ExecutorPorEtapa,
 } from "@/lib/scheduling";
 import {
@@ -39,6 +49,7 @@ import {
   type StatusPlanejamento,
 } from "@/lib/mock";
 import { isoHoje } from "@/lib/hoje";
+import { horarioParaDecimal, decimalParaHorarioInput, decimalParaHorario } from "@/lib/time-format";
 
 const MESES_ABREV = [
   "jan", "fev", "mar", "abr", "mai", "jun",
@@ -54,27 +65,6 @@ function dataAbreviada(iso: string): string {
 function diaDaSemana(iso: string): string {
   const [ano, mes, dia] = iso.split("-").map(Number);
   return DIAS_SEMANA_ABREV[new Date(Date.UTC(ano, mes - 1, dia)).getUTCDay()];
-}
-
-/** "01:30" -> 1.5 */
-function horarioParaDecimal(horario: string): number {
-  if (!horario) return 0;
-  const [h, m] = horario.split(":").map(Number);
-  return Math.round((h + m / 60) * 100) / 100;
-}
-
-/** 1.5 -> "01:30" */
-function decimalParaHorarioInput(decimal: number): string {
-  const h = Math.floor(decimal);
-  const m = Math.round((decimal - h) * 60);
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-}
-
-/** 1.5 -> "1h 30m" */
-function decimalParaHorasLabel(decimal: number): string {
-  const h = Math.floor(decimal);
-  const m = Math.round((decimal - h) * 60);
-  return `${h}h ${String(m).padStart(2, "0")}m`;
 }
 
 const STATUS_INFO: Record<StatusPlanejamento, { label: (folga?: number) => string; className: string }> = {
@@ -105,24 +95,83 @@ function Rotulo({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function PlanejamentoRecomendado({ tarefa }: { tarefa: Tarefa }) {
+/**
+ * `modoReplanejamento`: em vez de sugerir um planejamento do zero (fluxo de Triagem), edita as
+ * etapas ATUAL/futuras de um planejamento já aplicado — etapas concluídas ficam só leitura, e
+ * salvar chama `replanejarEtapasDaAtividade` (update in-place) em vez de `aplicarPlanejamento`
+ * (que sempre cria do zero). `onSalvar` avisa quem renderizou (o Dialog de replanejamento em
+ * task-detail-sheet.tsx) que terminou, pra fechar a tela.
+ */
+export function PlanejamentoRecomendado({
+  tarefa,
+  modoReplanejamento = false,
+  onSalvar,
+}: {
+  tarefa: Tarefa;
+  modoReplanejamento?: boolean;
+  onSalvar?: () => void;
+}) {
   const tarefasLive = useTasks();
+  // No replanejamento, a própria tarefa já está em tarefasLive com o plano ANTIGO — sem excluí-la,
+  // a checagem de disponibilidade abaixo contaria a alocação atual dela contra si mesma (sempre
+  // "ocupado" pelo que ela mesma já tinha reservado naquele dia).
+  const tarefasParaCapacidade = modoReplanejamento
+    ? tarefasLive.filter((t) => t.id !== tarefa.id)
+    : tarefasLive;
   const tipo = tipoById(tarefa.tipoId);
+  const planejamentoExistente = modoReplanejamento ? tarefa.planejamento : undefined;
+  const etapaAtualOrdem = planejamentoExistente?.etapaAtualOrdem ?? 1;
 
-  const [executoresPorEtapa, setExecutoresPorEtapa] = useState<ExecutorPorEtapa>(() =>
-    Object.fromEntries(
-      (tipo?.etapas ?? [])
-        .filter((e) => e.executorPadraoId)
-        .map((e) => [e.ordem, e.executorPadraoId as string])
-    )
+  // Um único passe sobre planejamentoExistente.etapas pra derivar o estado inicial da tabela de
+  // replanejamento (antes eram 4 loops independentes, um por useState). Só as etapas CONCLUÍDAS
+  // (ordem < etapaAtualOrdem) entram em concluirBloqueadas — são a âncora fixa da cadeia. As
+  // editáveis não começam com data forçada: recalculam pela duração, igual ao fluxo de criação
+  // (sem isso, precisaria "desforçar" cada etapa posterior a cada edição em cadeia).
+  const seedReplanejamento = useMemo(() => {
+    if (!planejamentoExistente) return null;
+    const etapasReais = [...planejamentoExistente.etapas].sort((a, b) => a.ordem - b.ordem);
+    const executores: ExecutorPorEtapa = {};
+    const duracoes: Record<number, number> = {};
+    const horas: Record<number, number> = {};
+    const concluirBloqueadas: Record<number, string> = {};
+    // Mesma convenção de cursor que calcularPlanejamentoSimples usa pra frente (etapa seguinte
+    // começa no mesmo dia em que a anterior termina, duração 0 é válido), contando em dias úteis
+    // (passosUteisEntre) — não corridos, senão um intervalo que cruza fim de semana erra a conta.
+    let cursor = proximoDiaUtil(tarefa.dataInicio || isoHoje());
+    for (const e of etapasReais) {
+      executores[e.ordem] = e.colaboradorId;
+      duracoes[e.ordem] = passosUteisEntre(cursor, e.dataFim);
+      horas[e.ordem] = e.alocacoes.reduce((soma, a) => soma + a.horas, 0);
+      if (e.ordem < planejamentoExistente.etapaAtualOrdem) concluirBloqueadas[e.ordem] = e.dataFim;
+      cursor = e.dataFim;
+    }
+    return { executores, duracoes, horas, concluirBloqueadas };
+  }, [planejamentoExistente, tarefa.dataInicio]);
+
+  const [executoresPorEtapa, setExecutoresPorEtapa] = useState<ExecutorPorEtapa>(
+    () =>
+      seedReplanejamento?.executores ??
+      Object.fromEntries(
+        (tipo?.etapas ?? [])
+          .filter((e) => e.executorPadraoId)
+          .map((e) => [e.ordem, e.executorPadraoId as string])
+      )
   );
-  const [duracoesPorEtapa, setDuracoesPorEtapa] = useState<Record<number, number>>({});
-  const [horasPorEtapa, setHorasPorEtapa] = useState<Record<number, number>>({});
+  const [duracoesPorEtapa, setDuracoesPorEtapa] = useState<Record<number, number>>(
+    () => seedReplanejamento?.duracoes ?? {}
+  );
+  const [horasPorEtapa, setHorasPorEtapa] = useState<Record<number, number>>(
+    () => seedReplanejamento?.horas ?? {}
+  );
   const [iniciosForcados, setIniciosForcados] = useState<Record<number, string>>({});
-  const [concluirForcados, setConcluirForcados] = useState<Record<number, string>>({});
+  const [concluirForcados, setConcluirForcados] = useState<Record<number, string>>(
+    () => seedReplanejamento?.concluirBloqueadas ?? {}
+  );
   const [editandoDataDesejada, setEditandoDataDesejada] = useState(false);
   const [dataDesejadaInput, setDataDesejadaInput] = useState("");
   const [expandido, setExpandido] = useState(false);
+  const [salvandoReplanejamento, setSalvandoReplanejamento] = useState(false);
+  const [erroReplanejamento, setErroReplanejamento] = useState(false);
 
   if (!tipo || tipo.etapas.length === 0) return null;
 
@@ -143,11 +192,43 @@ export function PlanejamentoRecomendado({ tarefa }: { tarefa: Tarefa }) {
   const previsaoConclusao = linhas.length
     ? linhas.reduce((max, l) => (l.concluirEm > max ? l.concluirEm : max), dataInicio)
     : dataInicio;
+  // Só relevante no replanejamento: as etapas concluídas entram na cadeia com data real fixa
+  // (concluirForcados), então uma data "fora de ordem" só pode vir de edição manual numa etapa
+  // editável — trava o Salvar em vez de deixar a sequência inconsistente.
+  const foraDeOrdem = modoReplanejamento && foraDeOrdemCronologica(linhas);
 
   function confirmarDataDesejada() {
     if (!dataDesejadaInput || !anoDoPrazoValido(dataDesejadaInput)) return;
     atualizarPrazoTarefa(tarefa.id, dataDesejadaInput);
     setEditandoDataDesejada(false);
+  }
+
+  async function salvarReplanejamento() {
+    if (!todasComExecutor || foraDeOrdem || salvandoReplanejamento) return;
+    setSalvandoReplanejamento(true);
+    setErroReplanejamento(false);
+    const etapasEditadas = linhas
+      .filter((l) => l.ordem >= etapaAtualOrdem)
+      .map((l) => ({
+        etapaId: l.etapaId,
+        ordem: l.ordem,
+        colaboradorId: l.colaboradorId,
+        alocacoes: distribuirHorasPorDia(l.inicioEm, l.concluirEm, l.horas),
+        dataFim: l.concluirEm,
+      }));
+    const sucesso = await replanejarEtapasDaAtividade(
+      tarefa.id,
+      etapasEditadas,
+      classificarStatus(previsaoConclusao, tarefa.prazo || undefined)
+    );
+    setSalvandoReplanejamento(false);
+    // Só fecha a tela quando o servidor confirma — senão uma falha parcial/total ficaria
+    // escondida atrás de um "salvo com sucesso" falso (a tela some como se tivesse dado certo).
+    if (sucesso) {
+      onSalvar?.();
+    } else {
+      setErroReplanejamento(true);
+    }
   }
 
   function criar() {
@@ -160,7 +241,7 @@ export function PlanejamentoRecomendado({ tarefa }: { tarefa: Tarefa }) {
           etapaId: l.etapaId,
           ordem: l.ordem,
           colaboradorId: l.colaboradorId,
-          alocacoes: [{ data: l.concluirEm, horas: l.horas }],
+          alocacoes: distribuirHorasPorDia(l.inicioEm, l.concluirEm, l.horas),
           dataFim: l.concluirEm,
         })),
         previsaoConclusao,
@@ -173,7 +254,7 @@ export function PlanejamentoRecomendado({ tarefa }: { tarefa: Tarefa }) {
     moveTask(tarefa.id, dataInicioAtividade <= isoHoje() ? "em-execucao" : "backlog");
   }
 
-  if (tarefa.planejamento) {
+  if (tarefa.planejamento && !modoReplanejamento) {
     return (
       <div>
         <Rotulo>Planejamento aplicado</Rotulo>
@@ -278,7 +359,7 @@ export function PlanejamentoRecomendado({ tarefa }: { tarefa: Tarefa }) {
           <span className="text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase">
             Esforço previsto
           </span>
-          <span className="text-sm font-medium">{decimalParaHorasLabel(esforcoPrevisto)}</span>
+          <span className="text-sm font-medium">{decimalParaHorario(esforcoPrevisto)}</span>
         </div>
         <div className="flex flex-col gap-1">
           <span className="text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase">
@@ -309,110 +390,154 @@ export function PlanejamentoRecomendado({ tarefa }: { tarefa: Tarefa }) {
               if (!linha) return null;
               const etapaInfo = etapaById(etapaDoTipo.etapaId);
               const ocupado = linha.colaboradorId
-                ? horasAlocadasPorDia(linha.colaboradorId, linha.concluirEm, {}, tarefasLive)
+                ? horasAlocadasPorDia(linha.colaboradorId, linha.concluirEm, {}, tarefasParaCapacidade)
                 : 0;
               const capacidade = linha.colaboradorId ? capacidadeDiaria(linha.colaboradorId) : 0;
               const disponivel = linha.colaboradorId ? ocupado + linha.horas <= capacidade : false;
+              // No replanejamento, etapa já concluída é só leitura — mostra o que de fato
+              // aconteceu, sem input, e não entra na validação de disponibilidade (já passou).
+              const bloqueada = modoReplanejamento && etapaDoTipo.ordem < etapaAtualOrdem;
               return (
-                <TableRow key={etapaDoTipo.ordem}>
+                <TableRow key={etapaDoTipo.ordem} className={cn(bloqueada && "text-muted-foreground")}>
                   <TableCell className="font-medium whitespace-nowrap">
                     {etapaInfo?.nome ?? "—"}
                   </TableCell>
                   <TableCell>
-                    <Input
-                      type="number"
-                      min={0}
-                      step={1}
-                      value={linha.duracaoDias}
-                      onChange={(e) => {
-                        const valor = Number(e.target.value) || 0;
-                        setDuracoesPorEtapa((prev) => ({ ...prev, [etapaDoTipo.ordem]: valor }));
-                        // volta a calcular "Concluir até" pela duração — se a pessoa tinha
-                        // editado essa data na mão antes, essa edição de duração assume de novo.
-                        setConcluirForcados((prev) =>
-                          Object.fromEntries(
-                            Object.entries(prev).filter(([ordem]) => ordem !== String(etapaDoTipo.ordem))
-                          )
-                        );
-                      }}
-                      className="h-8 w-16"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <div className="relative inline-block">
+                    {bloqueada ? (
+                      "—"
+                    ) : (
                       <Input
-                        type="time"
-                        value={decimalParaHorarioInput(linha.horas)}
-                        onChange={(e) =>
-                          setHorasPorEtapa((prev) => ({
-                            ...prev,
-                            [etapaDoTipo.ordem]: horarioParaDecimal(e.target.value),
-                          }))
-                        }
-                        className="h-8 w-32 pr-9"
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={linha.duracaoDias}
+                        onChange={(e) => {
+                          const valor = Number(e.target.value) || 0;
+                          setDuracoesPorEtapa((prev) => ({ ...prev, [etapaDoTipo.ordem]: valor }));
+                          // volta a calcular "Concluir até" pela duração — se a pessoa tinha
+                          // editado essa data na mão antes, essa edição de duração assume de novo.
+                          setConcluirForcados((prev) =>
+                            Object.fromEntries(
+                              Object.entries(prev).filter(([ordem]) => ordem !== String(etapaDoTipo.ordem))
+                            )
+                          );
+                        }}
+                        className="h-8 w-16"
                       />
-                      <span className="pointer-events-none absolute top-1/2 right-8 -translate-y-1/2 text-xs font-medium text-muted-foreground">
-                        h
-                      </span>
-                    </div>
+                    )}
                   </TableCell>
                   <TableCell>
-                    <Input
-                      type="date"
-                      value={linha.inicioEm}
-                      onChange={(e) =>
-                        e.target.value &&
-                        setIniciosForcados((prev) => ({ ...prev, [etapaDoTipo.ordem]: e.target.value }))
-                      }
-                      className="h-8 w-[8.75rem] text-xs"
-                    />
-                    <span className="mt-0.5 block text-[0.65rem] text-muted-foreground">
-                      {diaDaSemana(linha.inicioEm)}
-                    </span>
+                    {bloqueada ? (
+                      decimalParaHorario(linha.horas)
+                    ) : (
+                      <div className="relative inline-block">
+                        <Input
+                          type="time"
+                          value={decimalParaHorarioInput(linha.horas)}
+                          onChange={(e) =>
+                            setHorasPorEtapa((prev) => ({
+                              ...prev,
+                              [etapaDoTipo.ordem]: horarioParaDecimal(e.target.value) ?? 0,
+                            }))
+                          }
+                          className="h-8 w-32 pr-9"
+                        />
+                        <span className="pointer-events-none absolute top-1/2 right-8 -translate-y-1/2 text-xs font-medium text-muted-foreground">
+                          h
+                        </span>
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell className={cn(bloqueada && "text-xs")}>
+                    {bloqueada ? (
+                      dataAbreviada(linha.inicioEm)
+                    ) : (
+                      <>
+                        <Input
+                          type="date"
+                          value={linha.inicioEm}
+                          onChange={(e) => {
+                            if (!e.target.value) return;
+                            setIniciosForcados((prev) => ({ ...prev, [etapaDoTipo.ordem]: e.target.value }));
+                          }}
+                          className="h-8 w-[8.75rem] text-xs"
+                        />
+                        <span className="mt-0.5 block text-[0.65rem] text-muted-foreground">
+                          {diaDaSemana(linha.inicioEm)}
+                        </span>
+                      </>
+                    )}
+                  </TableCell>
+                  <TableCell className={cn(bloqueada && "text-xs")}>
+                    {bloqueada ? (
+                      dataAbreviada(linha.concluirEm)
+                    ) : (
+                      <>
+                        <Input
+                          type="date"
+                          value={linha.concluirEm}
+                          onChange={(e) => {
+                            if (!e.target.value) return;
+                            setConcluirForcados((prev) => ({ ...prev, [etapaDoTipo.ordem]: e.target.value }));
+                          }}
+                          className="h-8 w-[8.75rem] text-xs"
+                        />
+                        <span className="mt-0.5 block text-[0.65rem] text-muted-foreground">
+                          {diaDaSemana(linha.concluirEm)}
+                        </span>
+                      </>
+                    )}
                   </TableCell>
                   <TableCell>
-                    <Input
-                      type="date"
-                      value={linha.concluirEm}
-                      onChange={(e) =>
-                        e.target.value &&
-                        setConcluirForcados((prev) => ({ ...prev, [etapaDoTipo.ordem]: e.target.value }))
-                      }
-                      className="h-8 w-[8.75rem] text-xs"
-                    />
-                    <span className="mt-0.5 block text-[0.65rem] text-muted-foreground">
-                      {diaDaSemana(linha.concluirEm)}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <Select
-                      items={Object.fromEntries(COLABORADORES.map((c) => [c.id, c.nome]))}
-                      value={linha.colaboradorId}
-                      onValueChange={(v) =>
-                        typeof v === "string" &&
-                        v &&
-                        setExecutoresPorEtapa((prev) => ({ ...prev, [etapaDoTipo.ordem]: v }))
-                      }
-                    >
-                      <SelectTrigger className="h-8 w-48 gap-1.5">
+                    {bloqueada ? (
+                      <div className="flex items-center gap-1.5">
                         <ColaboradorAvatar
                           colaboradorId={linha.colaboradorId}
                           className="size-5 shrink-0"
                           fallbackClassName="text-[0.55rem]"
                         />
-                        <SelectValue placeholder="Escolher" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {COLABORADORES.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.nome}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                        <span className="truncate text-xs">
+                          {COLABORADORES.find((c) => c.id === linha.colaboradorId)?.nome ?? "—"}
+                        </span>
+                      </div>
+                    ) : (
+                      <Select
+                        items={Object.fromEntries(COLABORADORES.map((c) => [c.id, c.nome]))}
+                        value={linha.colaboradorId}
+                        onValueChange={(v) =>
+                          typeof v === "string" &&
+                          v &&
+                          setExecutoresPorEtapa((prev) => ({ ...prev, [etapaDoTipo.ordem]: v }))
+                        }
+                      >
+                        <SelectTrigger className="h-8 w-48 gap-1.5">
+                          <ColaboradorAvatar
+                            colaboradorId={linha.colaboradorId}
+                            className="size-5 shrink-0"
+                            fallbackClassName="text-[0.55rem]"
+                          />
+                          <SelectValue placeholder="Escolher" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {COLABORADORES.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.nome}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </TableCell>
-                  <TableCell className="text-center" title={`${ocupado}h de ${capacidade}h ocupadas nesse dia`}>
-                    {linha.colaboradorId &&
+                  <TableCell
+                    className="text-center"
+                    title={
+                      bloqueada
+                        ? undefined
+                        : `${decimalParaHorario(ocupado)} de ${decimalParaHorario(capacidade)} ocupadas nesse dia`
+                    }
+                  >
+                    {!bloqueada &&
+                      linha.colaboradorId &&
                       (disponivel ? (
                         <Check className="mx-auto size-4 text-success" />
                       ) : (
@@ -426,16 +551,35 @@ export function PlanejamentoRecomendado({ tarefa }: { tarefa: Tarefa }) {
         </Table>
       </div>
 
+      {foraDeOrdem && (
+        <p className="text-xs text-destructive">
+          Uma das datas ficou antes da etapa anterior — ajusta antes de salvar.
+        </p>
+      )}
+      {erroReplanejamento && (
+        <p className="text-xs text-destructive">
+          Não deu pra salvar o replanejamento agora — tenta de novo em instantes.
+        </p>
+      )}
       <button
         type="button"
-        disabled={!todasComExecutor}
-        onClick={criar}
+        disabled={!todasComExecutor || foraDeOrdem || salvandoReplanejamento}
+        onClick={modoReplanejamento ? salvarReplanejamento : criar}
         className="rounded-full bg-primary px-3.5 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        Criar atividade
+        {modoReplanejamento
+          ? salvandoReplanejamento
+            ? "Salvando..."
+            : "Salvar replanejamento"
+          : "Criar atividade"}
       </button>
     </>
   );
+
+  // Em modo replanejamento, quem renderiza (o Dialog em task-detail-sheet.tsx) já dá o
+  // enquadramento de "tela cheia" — aqui basta o conteúdo, sem a caixa/label/botão de expandir
+  // da versão usada na Triagem.
+  if (modoReplanejamento) return conteudo;
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-border/60 p-3">

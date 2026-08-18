@@ -140,10 +140,65 @@ export function calcularPlanejamentoSimples(
       for (let i = 0; i < duracaoDias; i++) concluirEm = proximoDiaUtil(proximoDia(concluirEm));
     }
     linhas.push({ ordem: etapa.ordem, etapaId: etapa.etapaId, colaboradorId, duracaoDias, horas, inicioEm, concluirEm });
+    // Duração 0 é "começa no mesmo dia em que a anterior termina" de propósito (ex: revisão de
+    // manhã, aprovação à tarde, mesmo dia) — não avança o cursor sozinho. Se as duas etapas forem
+    // da mesma pessoa, as horas dos dois se somam nesse dia no Workload, o que é o real: ela tem
+    // duas coisas pra fazer naquele dia mesmo.
     cursor = concluirEm;
   }
 
   return linhas;
+}
+
+/**
+ * Conta quantos avanços de dia útil (via `proximoDiaUtil(proximoDia(...))`, o mesmo laço que
+ * `calcularPlanejamentoSimples` usa pra interpretar `duracaoDias`) levam de `de` até `ate`.
+ * Inverso desse laço — usado pra semear a duração real de uma etapa já existente a partir só das
+ * datas salvas (replanejamento), garantindo que refazer o cálculo pra frente bate com o que já
+ * estava salvo em vez de usar dias corridos (que erram sempre que o intervalo cruza fim de semana).
+ */
+export function passosUteisEntre(de: string, ate: string): number {
+  let passos = 0;
+  let cursor = de;
+  while (cursor < ate) {
+    cursor = proximoDiaUtil(proximoDia(cursor));
+    passos++;
+  }
+  return passos;
+}
+
+/**
+ * true quando alguma etapa da sequência (ordenada por `ordem`, cada uma com sua `concluirEm`)
+ * termina ANTES da anterior — usada tanto pela validação da tela (foraDeOrdem, sobre a tabela
+ * inteira de linhas calculadas) quanto pela trava de segurança no servidor antes de persistir um
+ * ajuste/replanejamento (sobre a etapa anterior real + as editadas), garantindo as duas façam
+ * exatamente a mesma checagem em vez de duas implementações que podem divergir.
+ */
+export function foraDeOrdemCronologica(etapasOrdenadas: { concluirEm: string }[]): boolean {
+  return etapasOrdenadas.some((e, i) => i > 0 && e.concluirEm < etapasOrdenadas[i - 1].concluirEm);
+}
+
+/**
+ * Divide `horasTotais` igualmente entre os dias úteis do intervalo [inicioEm, concluirEm] — uma
+ * etapa de 3 dias com 3h previstas vira 1h em cada dia, em vez de tudo empilhado só na data
+ * final. Usada sempre que uma etapa (nova, ajustada ou replanejada) grava suas alocações, pra
+ * Workload e o calendário de atividades futuras refletirem a carga dia a dia de verdade.
+ */
+export function distribuirHorasPorDia(inicioEm: string, concluirEm: string, horasTotais: number): AlocacaoDia[] {
+  const dias: string[] = [];
+  let cursor = proximoDiaUtil(inicioEm);
+  while (cursor <= concluirEm) {
+    dias.push(cursor);
+    cursor = proximoDiaUtil(proximoDia(cursor));
+  }
+  if (dias.length === 0) return [{ data: concluirEm, horas: horasTotais }];
+
+  const horasPorDia = Math.round((horasTotais / dias.length) * 100) / 100;
+  const alocacoes = dias.map((data) => ({ data, horas: horasPorDia }));
+  // Ajusta o último dia pra absorver a sobra do arredondamento, sem perder/somar horas a mais.
+  const somaSemUltimo = alocacoes.slice(0, -1).reduce((soma, a) => soma + a.horas, 0);
+  alocacoes[alocacoes.length - 1].horas = Math.round((horasTotais - somaSemUltimo) * 100) / 100;
+  return alocacoes;
 }
 
 function gerarPlanejamentoBase(

@@ -13,9 +13,18 @@ import {
   type Comentario,
   type HistoricoEvento,
   type StatusAtividade,
+  type StatusPlanejamento,
+  type ExecutorPorFase,
 } from "@/lib/mock";
-import { proximoDia, proximoDiaUtil } from "@/lib/scheduling";
-import { isoHoje, diasEntre, formatDataCompleta } from "@/lib/hoje";
+import {
+  proximoDia,
+  proximoDiaUtil,
+  distribuirHorasPorDia,
+  foraDeOrdemCronologica,
+  passosUteisEntre,
+} from "@/lib/scheduling";
+import { decimalParaHorario } from "@/lib/time-format";
+import { isoHoje, formatDataCompleta } from "@/lib/hoje";
 import { SELECT_TAREFA as SELECT, linhaParaTarefa } from "@/lib/tarefa-mapper";
 import { createClient } from "@/lib/supabase/client";
 import { obterColaboradorAtual } from "@/lib/current-colaborador-client";
@@ -70,6 +79,40 @@ async function inserirHistorico(
     faseId: data.fase_id ?? undefined,
     acao: data.acao ?? undefined,
   };
+}
+
+/**
+ * Apaga e recria as alocações de uma linha de `planejamento_etapas` — usado sempre que uma etapa
+ * já aplicada tem sua data/horas ajustadas (ajustarEtapaEmExecucao, replanejarEtapasDaAtividade).
+ * Não dá pra só fazer UPDATE: o cálculo de carga por dia (horasAlocadasPorDia, usado pelo
+ * Workload e pela tool buscarCargaPorDia do keV) soma por data, então a alocação antiga precisa
+ * sumir e a nova entrar com a data/horas certas.
+ */
+async function substituirAlocacoesDaEtapa(
+  supabase: SupabaseClient,
+  planejamentoEtapaId: string,
+  alocacoes: { data: string; horas: number }[]
+) {
+  await supabase.from("planejamento_alocacoes").delete().eq("planejamento_etapa_id", planejamentoEtapaId);
+  if (alocacoes.length > 0) {
+    await supabase
+      .from("planejamento_alocacoes")
+      .insert(alocacoes.map((a) => ({ planejamento_etapa_id: planejamentoEtapaId, data: a.data, horas: a.horas })));
+  }
+}
+
+/**
+ * Se `ordem` for a etapa ATUAL da tarefa, calcula `executoresPorFase[faseAtualId]` já sincronizado
+ * com o novo executor — campo legado usado pela tool buscarCargaEquipe do keV pra contar carga do
+ * time; sem essa sincronização, a pessoa antiga continua "contando" na fase mesmo depois de
+ * substituída na etapa de verdade. Reatribuir uma etapa FUTURA não muda quem está de fato
+ * trabalhando na fase agora, então devolve o mesmo `executoresPorFase` de antes, sem tocar em
+ * nada. Função pura (não persiste sozinha) — quem chama decide como/quando gravar o resultado,
+ * usada por reatribuirExecutorEtapa e replanejarEtapasDaAtividade.
+ */
+function calcularExecutoresPorFaseAtualizado(t: Tarefa, ordem: number, novoColaboradorId: string): ExecutorPorFase {
+  if (ordem !== t.planejamento?.etapaAtualOrdem) return t.executoresPorFase;
+  return { ...t.executoresPorFase, [t.faseAtualId]: [novoColaboradorId] };
 }
 
 /**
@@ -281,6 +324,18 @@ export async function reatribuirExecutorEtapa(taskId: string, ordem: number, nov
     return;
   }
 
+  let novoExecutoresPorFase = calcularExecutoresPorFaseAtualizado(t, ordem, novoColaboradorId);
+  if (novoExecutoresPorFase !== t.executoresPorFase) {
+    const { error: erroExecutores } = await supabase
+      .from("tarefas")
+      .update({ executores_por_fase: novoExecutoresPorFase })
+      .eq("id", taskId);
+    if (erroExecutores) {
+      console.error("Falha ao sincronizar executoresPorFase:", erroExecutores.message);
+      novoExecutoresPorFase = t.executoresPorFase;
+    }
+  }
+
   const autor = await obterColaboradorAtual();
   const nomeEtapa = etapaById(etapaAlvo.etapaId)?.nome ?? etapaAlvo.etapaId;
   const hist = await inserirHistorico(
@@ -294,6 +349,7 @@ export async function reatribuirExecutorEtapa(taskId: string, ordem: number, nov
     x.id === taskId
       ? {
           ...x,
+          executoresPorFase: novoExecutoresPorFase,
           planejamento: {
             ...x.planejamento!,
             etapas: x.planejamento!.etapas.map((e) =>
@@ -717,12 +773,7 @@ export async function deslocarOcupacaoParaAjuste(
           .single();
         if (!etapaRow) continue;
         await supabase.from("planejamento_etapas").update({ data_fim: etapa.dataFim }).eq("id", etapaRow.id);
-        await supabase.from("planejamento_alocacoes").delete().eq("planejamento_etapa_id", etapaRow.id);
-        if (etapa.alocacoes.length > 0) {
-          await supabase
-            .from("planejamento_alocacoes")
-            .insert(etapa.alocacoes.map((a) => ({ planejamento_etapa_id: etapaRow.id, data: a.data, horas: a.horas })));
-        }
+        await substituirAlocacoesDaEtapa(supabase, etapaRow.id, etapa.alocacoes);
       }
     }
 
@@ -783,6 +834,22 @@ export async function atualizarStatusAtividade(taskId: string, novoStatus: Statu
     t.id === taskId ? { ...t, statusAtividade: novoStatus, historico: [...t.historico, hist] } : t
   );
   emit();
+}
+
+/** Exclui a tarefa definitivamente (não é o mesmo que arquivar/status "Arquivada", que só some
+ * do Workload mas mantém o registro). Comentários, checklist, histórico, planejamento, etapas e
+ * alocações são removidos junto via `on delete cascade` no banco. Retorna `false` sem mexer no
+ * estado local se a exclusão falhar. */
+export async function excluirTarefa(taskId: string): Promise<boolean> {
+  const supabase = createClient();
+  const { error } = await supabase.from("tarefas").delete().eq("id", taskId);
+  if (error) {
+    console.error("Falha ao excluir tarefa:", error.message);
+    return false;
+  }
+  tasks = tasks.filter((t) => t.id !== taskId);
+  emit();
+  return true;
 }
 
 /** Adiciona um comentário à tarefa — parte do "local de trabalho" da etapa em execução. */
@@ -894,25 +961,35 @@ export async function ajustarEtapaEmExecucao(
   const idx = etapasOriginais.findIndex((e) => e.ordem === ordem);
   if (idx === -1) return;
 
+  // Início "de verdade" da etapa editada é onde a anterior termina (ou o início da tarefa, se for
+  // a primeira) — não fica persistido à parte, mas é o mesmo critério usado ao montar a tabela de
+  // planejamento (ver seed de duracoesPorEtapa em planejamento-recomendado.tsx). Sem essa trava,
+  // uma data anterior à etapa anterior faria distribuirHorasPorDia não achar nenhum dia útil no
+  // intervalo e empilhar tudo de volta num dia só, silenciosamente.
+  const inicioEtapaEditada = idx > 0 ? etapasOriginais[idx - 1].dataFim : t.dataInicio || novaDataFim;
+  if (novaDataFim < inicioEtapaEditada) return;
+
   const novasEtapas = etapasOriginais.map((e) => ({ ...e, alocacoes: e.alocacoes.map((a) => ({ ...a })) }));
   novasEtapas[idx] = {
     ...novasEtapas[idx],
     dataFim: novaDataFim,
-    alocacoes: [{ data: novaDataFim, horas: novasHoras }],
+    alocacoes: distribuirHorasPorDia(inicioEtapaEditada, novaDataFim, novasHoras),
   };
 
-  // Etapas seguintes mantêm o mesmo espaçamento (em dias úteis) que já tinham entre si,
-  // só que a partir da nova data — é o que "empurra todo o resto" automaticamente.
+  // Etapas seguintes mantêm o mesmo espaçamento (em dias úteis) que já tinham entre si, só que a
+  // partir da nova data — é o que "empurra todo o resto" automaticamente. As horas de cada uma
+  // continuam as mesmas de antes, só redistribuídas pelos novos dias do intervalo deslocado.
   let cursorOriginal = etapasOriginais[idx].dataFim;
   let cursorNovo = novaDataFim;
   for (let j = idx + 1; j < novasEtapas.length; j++) {
-    const gap = diasEntre(cursorOriginal, etapasOriginais[j].dataFim);
+    const gap = passosUteisEntre(cursorOriginal, etapasOriginais[j].dataFim);
     let novoFim = cursorNovo;
     for (let k = 0; k < gap; k++) novoFim = proximoDiaUtil(proximoDia(novoFim));
+    const horasEtapa = etapasOriginais[j].alocacoes.reduce((soma, a) => soma + a.horas, 0);
     novasEtapas[j] = {
       ...novasEtapas[j],
       dataFim: novoFim,
-      alocacoes: novasEtapas[j].alocacoes.map((a) => ({ ...a, data: novoFim })),
+      alocacoes: distribuirHorasPorDia(cursorNovo, novoFim, horasEtapa),
     };
     cursorOriginal = etapasOriginais[j].dataFim;
     cursorNovo = novoFim;
@@ -934,12 +1011,7 @@ export async function ajustarEtapaEmExecucao(
         .single();
       if (!etapaRow) continue;
       await supabase.from("planejamento_etapas").update({ data_fim: etapa.dataFim }).eq("id", etapaRow.id);
-      await supabase.from("planejamento_alocacoes").delete().eq("planejamento_etapa_id", etapaRow.id);
-      if (etapa.alocacoes.length > 0) {
-        await supabase
-          .from("planejamento_alocacoes")
-          .insert(etapa.alocacoes.map((a) => ({ planejamento_etapa_id: etapaRow.id, data: a.data, horas: a.horas })));
-      }
+      await substituirAlocacoesDaEtapa(supabase, etapaRow.id, etapa.alocacoes);
     }
   }
   await supabase.from("tarefas").update({ previsao_conclusao: previsaoConclusao }).eq("id", taskId);
@@ -948,7 +1020,7 @@ export async function ajustarEtapaEmExecucao(
   const hist = await inserirHistorico(
     supabase,
     taskId,
-    `${autor?.nome ?? "Alguém"} ajustou a etapa "${nomeEtapa}" para ${novaDataFim} (${novasHoras}h) — as etapas seguintes foram reagendadas junto`,
+    `${autor?.nome ?? "Alguém"} ajustou a etapa "${nomeEtapa}" para ${novaDataFim} (${decimalParaHorario(novasHoras)}) — as etapas seguintes foram reagendadas junto`,
     { faseId: t.faseAtualId }
   );
 
@@ -963,4 +1035,136 @@ export async function ajustarEtapaEmExecucao(
       : x
   );
   emit();
+}
+
+/**
+ * Replanejamento: substitui os dados (data, horas, executor) das etapas ATUAL/FUTURAS recebidas
+ * em `etapasEditadas`, sem tocar nas concluídas (não fazem parte da lista). Diferente de
+ * `aplicarPlanejamento` (que sempre insere um planejamento novo do zero), essa função só faz
+ * UPDATE — preserva o `id` de cada linha `planejamento_etapas` (chave de dedup do convite
+ * proativo do keV em `kev_convites_atividade`) e o `tempoGastoHoras` já registrado nelas.
+ *
+ * Retorna `true` só quando TODAS as etapas enviadas e a atualização de previsão/status foram
+ * confirmadas no banco — quem chama (salvarReplanejamento) precisa aguardar essa confirmação
+ * antes de fechar a tela de replanejamento, senão uma falha vira um "salvou" falso pro usuário.
+ */
+export async function replanejarEtapasDaAtividade(
+  taskId: string,
+  etapasEditadas: EtapaAgendada[],
+  status: { status: StatusPlanejamento; folgaDias?: number }
+): Promise<boolean> {
+  const t = tasks.find((x) => x.id === taskId);
+  if (!t || !t.planejamento || etapasEditadas.length === 0) return false;
+
+  const etapasOrdenadas = [...etapasEditadas].sort((a, b) => a.ordem - b.ordem);
+  const etapasAtuais = [...t.planejamento.etapas].sort((a, b) => a.ordem - b.ordem);
+
+  // Trava de segurança: já validado na tela (foraDeOrdemCronologica), mas confere de novo aqui —
+  // etapa anterior real (concluída, se existir) + as editadas, na mesma ordem que serão salvas.
+  const etapaAnteriorReal = etapasAtuais.find((e) => e.ordem === etapasOrdenadas[0].ordem - 1);
+  const sequenciaParaValidar = etapaAnteriorReal ? [etapaAnteriorReal, ...etapasOrdenadas] : etapasOrdenadas;
+  if (foraDeOrdemCronologica(sequenciaParaValidar.map((e) => ({ concluirEm: e.dataFim })))) return false;
+
+  const supabase = createClient();
+  const { data: planRow, error: planErro } = await supabase
+    .from("planejamentos")
+    .select("id")
+    .eq("tarefa_id", taskId)
+    .single();
+  if (planErro || !planRow) {
+    console.error("Falha ao localizar planejamento pra replanejar:", planErro?.message);
+    return false;
+  }
+
+  // Só entram no estado local (e no histórico) as etapas cujo UPDATE realmente confirmou no
+  // banco — senão uma falha pontual deixaria a tela mostrando um valor que um recarregamento
+  // (recarregarTarefas) desfaria, sem avisar que aquela etapa específica não salvou. Etapas são
+  // linhas independentes (ordens diferentes), então os UPDATEs rodam em paralelo em vez de
+  // esperar um de cada vez.
+  const resultados = await Promise.all(
+    etapasOrdenadas.map(async (etapa) => {
+      const { data: etapaRow, error: etapaErro } = await supabase
+        .from("planejamento_etapas")
+        .update({ colaborador_id: etapa.colaboradorId, data_fim: etapa.dataFim })
+        .eq("planejamento_id", planRow.id)
+        .eq("ordem", etapa.ordem)
+        .select("id")
+        .single();
+      if (etapaErro || !etapaRow) {
+        console.error("Falha ao replanejar etapa:", etapaErro?.message);
+        return null;
+      }
+      await substituirAlocacoesDaEtapa(supabase, etapaRow.id, etapa.alocacoes);
+      return etapa;
+    })
+  );
+  const etapasSalvas = resultados.filter((e): e is EtapaAgendada => e !== null);
+  if (etapasSalvas.length === 0) return false;
+  // Sucesso parcial também é reportado como falha — sem isso o usuário via a tela fechar como se
+  // tivesse dado certo mesmo com uma etapa não persistida.
+  const sucessoTotal = etapasSalvas.length === etapasOrdenadas.length;
+
+  const novasEtapas = etapasAtuais.map((e) => {
+    const editada = etapasSalvas.find((n) => n.ordem === e.ordem);
+    return editada
+      ? { ...e, dataFim: editada.dataFim, colaboradorId: editada.colaboradorId, alocacoes: editada.alocacoes.map((a) => ({ ...a })) }
+      : e;
+  });
+  // Seed é a primeira etapa (sempre existe, já que etapasAtuais não é vazio) — não o
+  // previsaoConclusao antigo: o replanejamento pode ADIANTAR a entrega, não só atrasar, e um seed
+  // desatualizado nunca deixaria o resultado diminuir.
+  const previsaoConclusao = novasEtapas.reduce(
+    (max, e) => (e.dataFim > max ? e.dataFim : max),
+    novasEtapas[0].dataFim
+  );
+
+  // executoresPorFase (campo legado, usado por buscarCargaEquipe do keV) só reflete a etapa
+  // ATUAL — reatribuir uma etapa futura não muda quem está de fato trabalhando na fase agora.
+  const etapaAtualEditada = etapasSalvas.find((e) => e.ordem === t.planejamento!.etapaAtualOrdem);
+  const novoExecutoresPorFase = etapaAtualEditada
+    ? calcularExecutoresPorFaseAtualizado(t, etapaAtualEditada.ordem, etapaAtualEditada.colaboradorId)
+    : t.executoresPorFase;
+
+  const { error: erroTarefa } = await supabase
+    .from("tarefas")
+    .update({ previsao_conclusao: previsaoConclusao, executores_por_fase: novoExecutoresPorFase })
+    .eq("id", taskId);
+  if (erroTarefa) console.error("Falha ao atualizar previsão/executores após replanejar:", erroTarefa.message);
+  // status/folgaDias (badge "dentro do prazo"/"apertado"/"impossível") também ficariam presos ao
+  // valor de quando o plano foi aplicado pela primeira vez se não forem recalculados aqui.
+  const { error: erroStatus } = await supabase
+    .from("planejamentos")
+    .update({ status: status.status, folga_dias: status.folgaDias ?? null })
+    .eq("id", planRow.id);
+  if (erroStatus) console.error("Falha ao atualizar status do planejamento:", erroStatus.message);
+  const sucesso = sucessoTotal && !erroTarefa && !erroStatus;
+
+  const autor = await obterColaboradorAtual();
+  const plural = etapasSalvas.length === 1 ? "" : "s";
+  const hist = await inserirHistorico(
+    supabase,
+    taskId,
+    `${autor?.nome ?? "Alguém"} replanejou ${etapasSalvas.length} etapa${plural} restante${plural} da atividade`,
+    { faseId: t.faseAtualId }
+  );
+
+  tasks = tasks.map((x) =>
+    x.id === taskId
+      ? {
+          ...x,
+          executoresPorFase: novoExecutoresPorFase,
+          planejamento: {
+            ...x.planejamento!,
+            etapas: novasEtapas,
+            previsaoConclusao,
+            status: status.status,
+            folgaDias: status.folgaDias,
+          },
+          previsaoConclusao,
+          historico: [...x.historico, hist],
+        }
+      : x
+  );
+  emit();
+  return sucesso;
 }

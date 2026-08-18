@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ColaboradorAvatar } from "@/components/colaborador-avatar";
 import { PlanejamentoRecomendado } from "@/components/planejamento-recomendado";
 import { RegistroTempoEtapa } from "@/components/registro-tempo-etapa";
@@ -40,6 +40,7 @@ import {
   ajustarEtapaEmExecucao,
   atualizarPrazoTarefa,
   atualizarStatusAtividade,
+  excluirTarefa,
   ATENCAO_PREFIXO,
 } from "@/lib/task-store";
 import { useEtapas } from "@/lib/etapa-store";
@@ -88,6 +89,7 @@ import {
   Play,
   FileText,
   Pencil,
+  Trash2,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -226,9 +228,12 @@ export function TaskDetailSheet() {
   const [prazoInput, setPrazoInput] = useState("");
   const [etapaVisualizadaOrdem, setEtapaVisualizadaOrdem] = useState<number | null>(null);
   const [sequenciaAberta, setSequenciaAberta] = useState(false);
+  const [replanejando, setReplanejando] = useState(false);
   const [etapaAtualChecada, setEtapaAtualChecada] = useState<Record<string, boolean>>({});
   const [editandoTitulo, setEditandoTitulo] = useState(false);
   const [tituloInput, setTituloInput] = useState("");
+  const [confirmandoExclusao, setConfirmandoExclusao] = useState(false);
+  const [excluindo, setExcluindo] = useState(false);
 
   function close() {
     const params = new URLSearchParams(searchParams.toString());
@@ -393,6 +398,54 @@ export function TaskDetailSheet() {
                 </SelectContent>
               </Select>
             </div>
+
+            <Popover open={confirmandoExclusao} onOpenChange={setConfirmandoExclusao}>
+              <PopoverTrigger
+                render={
+                  <button
+                    type="button"
+                    className="ml-auto shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    aria-label="Excluir tarefa"
+                    title="Excluir tarefa"
+                  />
+                }
+              >
+                <Trash2 className="size-4" />
+              </PopoverTrigger>
+              <PopoverContent side="bottom" align="end" className="w-72 p-3">
+                <p className="text-sm font-medium">Excluir esta tarefa?</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Remove a tarefa, o histórico, os comentários e o planejamento dela
+                  permanentemente. Essa ação não pode ser desfeita.
+                </p>
+                <div className="mt-3 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setConfirmandoExclusao(false)}
+                    className="rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={excluindo}
+                    onClick={async () => {
+                      setExcluindo(true);
+                      const ok = await excluirTarefa(tarefa.id);
+                      setExcluindo(false);
+                      if (ok) {
+                        close();
+                      } else {
+                        setConfirmandoExclusao(false);
+                      }
+                    }}
+                    className="rounded-md bg-destructive px-2.5 py-1 text-xs font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-60"
+                  >
+                    {excluindo ? "Excluindo..." : "Excluir definitivamente"}
+                  </button>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
           <div className="mt-1 flex items-center gap-1.5">
             <FileText className="size-4 shrink-0 text-muted-foreground" />
@@ -1293,9 +1346,25 @@ export function TaskDetailSheet() {
                   )}
                 </PopoverTrigger>
                 <PopoverContent side="top" align="center" className="w-72 p-1.5">
-                  <p className="px-2 py-1 text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase">
-                    Sequência da atividade
-                  </p>
+                  <div className="flex items-center justify-between gap-2 px-2 py-1">
+                    <p className="text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase">
+                      Sequência da atividade
+                    </p>
+                    {fluxoEmAndamento && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSequenciaAberta(false);
+                          setReplanejando(true);
+                        }}
+                        className="shrink-0 text-muted-foreground hover:text-foreground"
+                        aria-label="Replanejar etapas da atividade"
+                        title="Replanejar etapas da atividade"
+                      >
+                        <Pencil className="size-3.5" />
+                      </button>
+                    )}
+                  </div>
                   <div className="flex flex-col gap-0.5">
                     {etapasPlano.map((etapa) => {
                       const info = etapaById(etapa.etapaId);
@@ -1384,6 +1453,26 @@ export function TaskDetailSheet() {
                 </PopoverContent>
               </Popover>
 
+              {replanejando && (
+                <Dialog open onOpenChange={(v) => !v && setReplanejando(false)}>
+                  <DialogContent className="flex h-[92vh] w-[96vw] max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-none">
+                    <DialogHeader className="border-b border-border/60 p-4 pb-3">
+                      <DialogTitle>Replanejar etapas — {tarefa.titulo}</DialogTitle>
+                    </DialogHeader>
+                    <ScrollArea className="min-w-0 flex-1 px-4 py-3">
+                      <div className="flex flex-col gap-3 pb-4">
+                        <PlanejamentoRecomendado
+                          key={tarefa.id}
+                          tarefa={tarefa}
+                          modoReplanejamento
+                          onSalvar={() => setReplanejando(false)}
+                        />
+                      </div>
+                    </ScrollArea>
+                  </DialogContent>
+                </Dialog>
+              )}
+
               <button
                 type="button"
                 onClick={() => setEtapaVisualizadaOrdem(etapasPlano[indexVisualizado + 1].ordem)}
@@ -1439,28 +1528,44 @@ export function TaskDetailSheet() {
                   className="h-7 w-16 text-xs"
                 />
                 <span className="text-xs text-muted-foreground">h</span>
-                <button
-                  type="button"
-                  disabled={!dataEtapaInput || !anoDoPrazoValido(dataEtapaInput)}
-                  title={
-                    dataEtapaInput && !anoDoPrazoValido(dataEtapaInput)
-                      ? MENSAGEM_ANO_INVALIDO
-                      : "Salvar"
-                  }
-                  onClick={() => {
-                    ajustarEtapaEmExecucao(
-                      tarefa.id,
-                      etapaVisualizada.ordem,
-                      dataEtapaInput,
-                      Number(horasEtapaInput) || 0
-                    );
-                    setEditandoEtapaAtual(false);
-                  }}
-                  className="shrink-0 text-success disabled:cursor-not-allowed disabled:text-muted-foreground/40"
-                  aria-label="Salvar"
-                >
-                  <Check className="size-4" />
-                </button>
+                {(() => {
+                  const etapaAnteriorAtual = etapasPlano.find((e) => e.ordem === etapaVisualizada.ordem - 1);
+                  // Primeira etapa (sem anterior na lista) usa o início da tarefa como piso —
+                  // mesmo critério do fallback em ajustarEtapaEmExecucao (task-store.ts). Sem
+                  // isso, editar a etapa 1 nunca bloqueava data anterior ao início da tarefa, e o
+                  // "Salvar" ficava sempre habilitado mesmo quando o servidor ia rejeitar em
+                  // silêncio (sem feedback nenhum, o painel só fechava como se tivesse salvo).
+                  const pisoData = etapaAnteriorAtual?.dataFim ?? tarefa.dataInicio;
+                  const antesDaEtapaAnteriorAtual = !!pisoData && dataEtapaInput < pisoData;
+                  return (
+                    <button
+                      type="button"
+                      disabled={
+                        !dataEtapaInput || !anoDoPrazoValido(dataEtapaInput) || antesDaEtapaAnteriorAtual
+                      }
+                      title={
+                        dataEtapaInput && !anoDoPrazoValido(dataEtapaInput)
+                          ? MENSAGEM_ANO_INVALIDO
+                          : antesDaEtapaAnteriorAtual
+                            ? `Não pode ser antes de ${formatData(pisoData!)} (${etapaAnteriorAtual ? "etapa anterior" : "início da tarefa"})`
+                            : "Salvar"
+                      }
+                      onClick={() => {
+                        ajustarEtapaEmExecucao(
+                          tarefa.id,
+                          etapaVisualizada.ordem,
+                          dataEtapaInput,
+                          Number(horasEtapaInput) || 0
+                        );
+                        setEditandoEtapaAtual(false);
+                      }}
+                      className="shrink-0 text-success disabled:cursor-not-allowed disabled:text-muted-foreground/40"
+                      aria-label="Salvar"
+                    >
+                      <Check className="size-4" />
+                    </button>
+                  );
+                })()}
                 <button
                   type="button"
                   onClick={() => setEditandoEtapaAtual(false)}
