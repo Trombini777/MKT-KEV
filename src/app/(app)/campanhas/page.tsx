@@ -1,8 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
+import { ListFilter } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { PageHeader } from "@/components/page-header";
 import { StatusProjetoEditor } from "@/components/status-projeto-editor";
 import { ProjetoSheet } from "@/components/projeto-sheet";
@@ -10,6 +18,8 @@ import { colaboradorById, type StatusProjeto } from "@/lib/mock";
 import { useProjetos, adicionarProjeto, editarProjeto } from "@/lib/projeto-store";
 import { useColaboradores } from "@/lib/colaborador-store";
 import { useTasks } from "@/lib/task-store";
+
+const TODOS_STATUS: StatusProjeto[] = ["Planejado", "Ativo", "Concluído", "Cancelado"];
 
 function formatData(iso: string) {
   const [ano, mes, dia] = iso.split("-");
@@ -20,11 +30,22 @@ export default function CampanhasPage() {
   const todosProjetos = useProjetos();
   useColaboradores();
   const todasAsTarefas = useTasks();
-  const campanhas = todosProjetos.filter((p) => p.tipo === "Campanha");
+  // Só "Ativo" marcado por padrão — os outros status (Planejado, Concluído, Cancelado) ficam
+  // escondidos até a pessoa marcar explicitamente que quer vê-los também.
+  const [statusSelecionados, setStatusSelecionados] = useState<StatusProjeto[]>(["Ativo"]);
+  const campanhas = todosProjetos.filter(
+    (p) => p.tipo === "Campanha" && statusSelecionados.includes(p.status)
+  );
 
   function mudarStatus(projetoId: string, novoStatus: StatusProjeto) {
     const projeto = todosProjetos.find((p) => p.id === projetoId);
     if (projeto) editarProjeto({ ...projeto, status: novoStatus });
+  }
+
+  function alternarFiltro(status: StatusProjeto, marcado: boolean) {
+    setStatusSelecionados((atuais) =>
+      marcado ? [...atuais, status] : atuais.filter((s) => s !== status)
+    );
   }
 
   return (
@@ -32,9 +53,39 @@ export default function CampanhasPage() {
       <PageHeader
         title="Campanhas"
         description="Ações sazonais ou com data-gatilho (datas comemorativas, janelas regulatórias etc.)."
-        action={<ProjetoSheet tipo="Campanha" onCriar={adicionarProjeto} />}
       />
 
+      <div className="mb-4 flex items-center gap-2">
+        <DropdownMenu>
+          <DropdownMenuTrigger className="flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted">
+            <ListFilter className="size-3.5" />
+            Status
+            {statusSelecionados.length > 0 && statusSelecionados.length < TODOS_STATUS.length && (
+              <span className="grid size-4 place-items-center rounded-full bg-primary text-[0.65rem] font-semibold text-primary-foreground">
+                {statusSelecionados.length}
+              </span>
+            )}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            {TODOS_STATUS.map((status) => (
+              <DropdownMenuCheckboxItem
+                key={status}
+                checked={statusSelecionados.includes(status)}
+                onCheckedChange={(marcado) => alternarFiltro(status, marcado)}
+              >
+                {status}
+              </DropdownMenuCheckboxItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <ProjetoSheet tipo="Campanha" onCriar={adicionarProjeto} />
+      </div>
+
+      {campanhas.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-border/60 py-8 text-center text-sm text-muted-foreground">
+          Nenhuma campanha com o status selecionado.
+        </p>
+      ) : (
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {campanhas.map((campanha) => {
           const tarefasDoProjeto = todasAsTarefas.filter((t) => t.projetoId === campanha.id);
@@ -87,6 +138,7 @@ export default function CampanhasPage() {
           );
         })}
       </div>
+      )}
     </div>
   );
 }

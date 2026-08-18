@@ -14,18 +14,22 @@ function formatData(iso: string) {
 }
 
 const STATUS_ATIVIDADE_CLASSES: Record<StatusAtividade, string> = {
-  Ativa: "bg-primary/15 text-primary",
+  Ativa: "bg-primary text-primary-foreground",
   Pausada: "bg-warning/15 text-warning",
   Concluída: "bg-success/10 text-success",
   Arquivada: "bg-muted text-muted-foreground",
 };
 
 /** Quem executou por último: a etapa atual (planejamento em andamento), a última etapa (já
- * concluída) ou, sem planejamento aplicado ainda, o executor legado da fase atual. */
+ * concluída, ou o plano já passou de todas as etapas mas a fase da tarefa ainda não migrou pra
+ * "concluido" — mesmo critério de `planoFinalizado` em task-detail-sheet.tsx) ou, sem
+ * planejamento aplicado ainda, o executor legado da fase atual. */
 function executorDaTarefa(tarefa: Tarefa): string | undefined {
   if (tarefa.planejamento) {
     const { etapas, etapaAtualOrdem } = tarefa.planejamento;
-    if (tarefa.faseAtualId === "concluido") {
+    const maxOrdem = etapas.reduce((max, e) => Math.max(max, e.ordem), 0);
+    const planoFinalizado = etapaAtualOrdem > maxOrdem;
+    if (tarefa.faseAtualId === "concluido" || planoFinalizado) {
       const ultima = etapas.reduce((max, e) => (e.ordem > max.ordem ? e : max), etapas[0]);
       return ultima?.colaboradorId;
     }
