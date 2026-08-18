@@ -25,11 +25,11 @@ import {
 export function PainelDeTrabalho({ usuario }: { usuario: Colaborador }) {
   // Pausada/Arquivada saem do Painel (mas continuam existindo — ver task-detail-sheet.tsx).
   const tarefas = useTasks().filter(tarefaContaNoWorkload);
-  const colaboradores = useColaboradores();
-  // Garante que TaskExecutionList/AtividadesEntrandoEmBreve (que leem etapaById direto, sem
-  // hook) re-renderizem assim que o catálogo de etapas hidratar — ver o comentário equivalente
-  // em task-detail-sheet.tsx.
+  // Garante que TaskExecutionList/AtividadesEntrandoEmBreve (que leem etapaById/colaboradorById
+  // direto, sem hook) re-renderizem assim que os catálogos de etapas/colaboradores hidratarem —
+  // ver o comentário equivalente em task-detail-sheet.tsx.
   useEtapas();
+  useColaboradores();
 
   const [diaSelecionado, setDiaSelecionado] = useState<string | null>(null);
 
@@ -89,8 +89,6 @@ export function PainelDeTrabalho({ usuario }: { usuario: Colaborador }) {
           diaSelecionado={diaSelecionado}
         />
       </section>
-
-      <p className="mt-6 text-xs text-muted-foreground">{colaboradores.length} pessoas no time.</p>
     </div>
   );
 }

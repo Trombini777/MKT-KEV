@@ -324,6 +324,46 @@ export function AssistantOrb() {
     };
   }, [tarefaFocadaId, setMessages]);
 
+  // Saudação proativa do primeiro acesso do dia: 5s depois de abrir o sistema, se ainda não falou
+  // com o keV hoje (em nenhuma aba/sessão), mostra o balãozinho com uma saudação (mesmo mecanismo
+  // do convite de tarefa acima) — sem abrir o chat inteiro sozinho. `AssistantOrb` vive no layout
+  // raiz, então esse efeito roda uma vez por carregamento de página, não a cada navegação.
+  useEffect(() => {
+    let cancelado = false;
+    const timer = setTimeout(async () => {
+      try {
+        const historicoHoje = await carregarHistoricoKev();
+        if (cancelado || historicoHoje.length > 0) return;
+        const saudacao = await gerarSaudacaoKev();
+        if (cancelado || !saudacao) return;
+        if (abertoRef.current) {
+          const novaMensagem: UIMessage = {
+            id: saudacao.id,
+            role: "assistant",
+            parts: [{ type: "text", text: saudacao.texto }],
+          };
+          setMessages((atuais) =>
+            atuais.some((m) => m.id === novaMensagem.id) ? atuais : [...atuais, novaMensagem]
+          );
+        } else {
+          // Guarda funcional: se o convite de tarefa já colocou algo pendente (ex.: a pessoa abriu
+          // uma atividade nesses primeiros 5s), não sobrescreve — o convite de tarefa é mais
+          // específico/acionável que uma saudação genérica.
+          setConvitePendente((atual) => atual ?? { id: saudacao.id, texto: saudacao.texto });
+        }
+      } catch (erro) {
+        // Mesma lógica do convite de tarefa: isso é proativo, uma falha aqui não deve incomodar
+        // ninguém com um erro na tela, só registrar pra investigação.
+        if (!cancelado) console.error("Falha ao gerar saudação proativa do keV:", erro);
+      }
+    }, 5000);
+    return () => {
+      cancelado = true;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só na primeira montagem da página
+  }, []);
+
   // Clique no balãozinho: abre o chat já "limpo", só com a fala do convite na tela — sem carregar
   // o resto da conversa de hoje (isso ficaria visualmente misturado com o assunto da tarefa).
   const abrirPorConvite = useCallback(async () => {

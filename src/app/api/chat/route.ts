@@ -12,7 +12,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getUsuarioAtual } from "@/lib/usuario-atual";
 import { isoHoje, diasEntre } from "@/lib/hoje";
 import { formatarAgoraBrasil, dataCurtaBrasil } from "@/lib/kev-tempo";
-import { ehCargoDeGestao } from "@/lib/kev-cargo";
+import { ehCargoDeGestao, ehTimeDeTecnologia } from "@/lib/kev-cargo";
 import { carregarContextoAnteriorKev } from "@/lib/kev";
 import { buscarContextoTarefaFocada } from "@/lib/kev-tarefa";
 import { etapaAtualDe, ehMinhaAtividade } from "@/lib/tarefa-etapa";
@@ -42,14 +42,27 @@ function montarSystemPrompt(
 ): string {
   const primeiroNome = nome.split(" ")[0];
   const fasesResumo = FASES.map((f) => f.nome).join(" -> ");
-  const focoGestao = ehCargoDeGestao(cargo)
-    ? `FOCO (cargo de gestão): ${nome} coordena outras pessoas. Priorize, por padrão, uma visão de` +
-      ` time: carga de trabalho da equipe, gargalos entre pessoas, aprovações que dependem dele(a),` +
-      ` projetos e campanhas em risco. Ainda assim, responda de bom grado quando ele(a) perguntar` +
-      ` especificamente sobre as próprias atividades.`
-    : `FOCO (cargo operacional): priorize, por padrão, uma visão pessoal: as atividades, prazos e` +
-      ` aprovações do próprio ${nome}. Só entre em dados do time inteiro ou de outras pessoas se` +
-      ` ele(a) perguntar por isso diretamente.`;
+  const ehTecnologia = ehTimeDeTecnologia(cargo);
+  const focoGestao = ehTecnologia
+    ? `FOCO (time de tecnologia, avaliando o sistema): ${nome} é do time de tecnologia da Kev, não` +
+      ` do marketing, e não tem atividades, prazos ou carga de trabalho reais aqui, então NUNCA` +
+      ` trate ${nome} como se tivesse. O objetivo de ${nome} estar no sistema é conhecer como ele` +
+      ` funciona. Seu papel muda: em vez de ajudar a organizar trabalho, dê um tour. Se ofereça` +
+      ` proativamente pra mostrar as funcionalidades, pergunte o que ele(a) quer ver primeiro, e` +
+      ` explique cada parte não só no "o que faz", mas no "por que existe e que problema resolve` +
+      ` pro time de marketing" (ex: o Workload existe porque sem ele ninguém sabia se alguém` +
+      ` estava sobrecarregado até o problema já ter acontecido). Convide ${nome} a pedir` +
+      ` demonstrações concretas ("me mostra como funciona X", "explica o fluxo de Y") e use as` +
+      ` ferramentas disponíveis pra trazer dados reais do sistema (atividades, projetos, carga da` +
+      ` equipe de marketing) como exemplo, não só teoria.`
+    : ehCargoDeGestao(cargo)
+      ? `FOCO (cargo de gestão): ${nome} coordena outras pessoas. Priorize, por padrão, uma visão de` +
+        ` time: carga de trabalho da equipe, gargalos entre pessoas, aprovações que dependem dele(a),` +
+        ` projetos e campanhas em risco. Ainda assim, responda de bom grado quando ele(a) perguntar` +
+        ` especificamente sobre as próprias atividades.`
+      : `FOCO (cargo operacional): priorize, por padrão, uma visão pessoal: as atividades, prazos e` +
+        ` aprovações do próprio ${nome}. Só entre em dados do time inteiro ou de outras pessoas se` +
+        ` ele(a) perguntar por isso diretamente.`;
   return [
     `Você é o keV, o assistente pessoal de trabalho da Kev Seguros, não um chatbot genérico.`,
     `Você está conversando com ${nome} (${cargo}). Trate-o(a) pelo nome, não use "usuário" ou "você aí".`,
@@ -97,9 +110,16 @@ function montarSystemPrompt(
       `- EQUIPE cadastra colaboradores, squads e capacidade semanal de cada um.\n` +
       `- DASHBOARDS mostram produtividade: atividades por pessoa, por etapa, por squad, e o` +
       ` comparativo planejado vs. entregue.\n` +
-      `Se ${nome} for gestão, enfatize como o sistema dá visibilidade da carga e do fluxo do` +
-      ` time inteiro (Workload, Dashboards, Projetos). Se for operacional, enfatize o Painel de` +
-      ` Trabalho e como organizar o próprio dia a dia dentro do fluxo.`,
+      ehTecnologia
+        ? `Como ${nome} é do time de tecnologia, não enfatize "o que fazer hoje" (não se aplica) —` +
+          ` enfatize a cobertura completa: como as peças se encaixam (intake -> triagem -> fluxo` +
+          ` configurável de etapas -> planejamento por capacidade -> execução -> performance), o` +
+          ` que é dado real (Supabase/Postgres com RLS por colaborador) vs. o que ainda é reserva` +
+          ` de escopo, e sinta-se à vontade pra comentar decisões de modelagem quando perguntado.`
+        : ehCargoDeGestao(cargo)
+          ? `Se ${nome} for gestão, enfatize como o sistema dá visibilidade da carga e do fluxo do` +
+            ` time inteiro (Workload, Dashboards, Projetos).`
+          : `Enfatize o Painel de Trabalho e como organizar o próprio dia a dia dentro do fluxo.`,
     ``,
     `FLUXO DE TRABALHO DO SISTEMA: toda atividade passa pelas fases, nessa ordem: ${fasesResumo}.`,
     ``,

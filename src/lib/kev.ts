@@ -5,7 +5,7 @@ import { generateText } from "ai";
 import { createClient } from "@/lib/supabase/server";
 import { getUsuarioAtual } from "@/lib/usuario-atual";
 import { formatarAgoraBrasil, inicioDoDiaBrasilISO } from "@/lib/kev-tempo";
-import { ehCargoDeGestao } from "@/lib/kev-cargo";
+import { ehCargoDeGestao, ehTimeDeTecnologia } from "@/lib/kev-cargo";
 import { REGRAS_ESTILO } from "@/lib/kev-estilo";
 
 export type KevMensagemHistorico = {
@@ -188,13 +188,30 @@ type UsuarioKev = { nome: string; cargo: string };
 /** Apresentação completa — só roda uma vez, na primeira conversa que a pessoa já teve com o keV. */
 async function gerarTextoApresentacao(usuario: UsuarioKev): Promise<string> {
   const primeiroNome = usuario.nome.split(" ")[0];
-  const focoCapacidades = ehCargoDeGestao(usuario.cargo)
-    ? `${primeiroNome} está em posição de coordenação (${usuario.cargo}), então ao explicar com` +
-      ` que você ajuda, mencione carga de trabalho do time, gargalos e aprovações da equipe, além` +
-      ` das próprias atividades dele(a). A oferta final deve seguir essa linha de gestão.`
-    : `O cargo de ${primeiroNome} é operacional (${usuario.cargo}), então ao explicar com que você` +
-      ` ajuda, foque nas atividades, prazos e aprovações do próprio ${primeiroNome}. A oferta` +
-      ` final deve seguir essa linha pessoal.`;
+  const focoCapacidades = ehTimeDeTecnologia(usuario.cargo)
+    ? `${primeiroNome} é do time de tecnologia da Kev (${usuario.cargo}), não do marketing, e está` +
+      ` aqui pra conhecer o sistema, não pra organizar trabalho de verdade nele. Ao explicar com` +
+      ` que você ajuda, diga que seu papel normalmente é ajudar o time de marketing a organizar` +
+      ` atividades, prazos, carga de trabalho e aprovações, e que com ${primeiroNome} você pode dar` +
+      ` um tour: mostrar as funcionalidades e explicar como cada uma ajuda o time. A oferta final` +
+      ` deve ser convidar ${primeiroNome} a escolher por onde começar o tour, não perguntar sobre` +
+      ` rotina/dia a dia (isso não se aplica).`
+    : ehCargoDeGestao(usuario.cargo)
+      ? `${primeiroNome} está em posição de coordenação (${usuario.cargo}), então ao explicar com` +
+        ` que você ajuda, mencione carga de trabalho do time, gargalos e aprovações da equipe, além` +
+        ` das próprias atividades dele(a). A oferta final deve seguir essa linha de gestão.`
+      : `O cargo de ${primeiroNome} é operacional (${usuario.cargo}), então ao explicar com que` +
+        ` você ajuda, foque nas atividades, prazos e aprovações do próprio ${primeiroNome}. A` +
+        ` oferta final deve seguir essa linha pessoal.`;
+
+  const pontoFinal = ehTimeDeTecnologia(usuario.cargo)
+    ? `5. Pergunte como ${primeiroNome} prefere ser chamado(a) (pode ser o primeiro nome mesmo ou` +
+      ` um apelido) e, na mesma frase ou na seguinte, pergunte por onde ele(a) quer começar o tour` +
+      ` pelo sistema (não pergunte sobre rotina/dia a dia, isso não se aplica a ${primeiroNome}).`
+    : `5. Pergunte como ${primeiroNome} prefere ser chamado(a) (pode ser o primeiro nome mesmo ou` +
+      ` um apelido). Diga também que, se ele(a) contar um pouco de como gosta de começar o dia e` +
+      ` da própria rotina, você já se ajusta a isso, mas que dá pra configurar ou mudar isso depois` +
+      ` a qualquer momento.`;
 
   const { text } = await generateText({
     model: openai("gpt-5.4-mini"),
@@ -216,14 +233,11 @@ async function gerarTextoApresentacao(usuario: UsuarioKev): Promise<string> {
       `4. Avise, de forma leve e sem soar como aviso legal, que você ainda está em fase de` +
       ` treinamento, e que por isso de vez em quando vai perguntar se uma resposta fez sentido, ou` +
       ` convidar ${primeiroNome} a explicar como prefere que algo seja detalhado ou feito.\n` +
-      `5. Pergunte como ${primeiroNome} prefere ser chamado(a) (pode ser o primeiro nome mesmo ou` +
-      ` um apelido). Diga também que, se ele(a) contar um pouco de como gosta de começar o dia e` +
-      ` da própria rotina, você já se ajusta a isso, mas que dá pra configurar ou mudar isso depois` +
-      ` a qualquer momento.\n\n` +
+      `${pontoFinal}\n\n` +
       `FORMATO: cada um dos 5 pontos acima vira seu próprio parágrafo curto (pode juntar dois` +
       ` pontos relacionados se ficar mais natural, ex: 4 e 5 podem virar um parágrafo só).\n\n` +
       `${REGRAS_ESTILO}\n` +
-      `- O ponto 5 (pergunta do apelido) é a única pergunta da mensagem, e deve ficar por último.\n\n` +
+      `- As perguntas do ponto 5 são as únicas perguntas da mensagem, e devem ficar por último.\n\n` +
       `Exemplo do tom e formato certos (segunda de manhã, cargo operacional):\n` +
       `"Semana acabou de começar, ainda com aquele silêncio de segunda cedo.\n\n` +
       `Bom te conhecer, Eliezer. Sou o keV, vou ser seu assistente pessoal de trabalho aqui na Kev.\n\n` +
@@ -241,11 +255,16 @@ async function gerarTextoApresentacao(usuario: UsuarioKev): Promise<string> {
 /** Saudação de um dia novo — mais curta, sem repetir a apresentação, mas ainda comenta o momento. */
 async function gerarTextoSaudacaoDiaria(usuario: UsuarioKev): Promise<string> {
   const primeiroNome = usuario.nome.split(" ")[0];
-  const ofertaFinal = ehCargoDeGestao(usuario.cargo)
-    ? `A oferta final deve ser de foco em gestão (ex: revisar a carga do time, ver aprovações` +
-      ` pendentes da equipe), já que ${primeiroNome} está em posição de coordenação (${usuario.cargo}).`
-    : `A oferta final deve ser de foco pessoal (ex: organizar as próprias atividades e prazos de` +
-      ` ${primeiroNome}), já que o cargo dele(a) é operacional (${usuario.cargo}).`;
+  const ofertaFinal = ehTimeDeTecnologia(usuario.cargo)
+    ? `A oferta final deve convidar ${primeiroNome} a continuar conhecendo o sistema (ex: ver mais` +
+      ` alguma funcionalidade, pedir uma demonstração de algo específico) — ${primeiroNome} é do` +
+      ` time de tecnologia, não tem atividades/prazos reais aqui, então nunca ofereça ajuda com` +
+      ` "seu trabalho".`
+    : ehCargoDeGestao(usuario.cargo)
+      ? `A oferta final deve ser de foco em gestão (ex: revisar a carga do time, ver aprovações` +
+        ` pendentes da equipe), já que ${primeiroNome} está em posição de coordenação (${usuario.cargo}).`
+      : `A oferta final deve ser de foco pessoal (ex: organizar as próprias atividades e prazos de` +
+        ` ${primeiroNome}), já que o cargo dele(a) é operacional (${usuario.cargo}).`;
 
   const { text } = await generateText({
     model: openai("gpt-5.4-mini"),
@@ -254,17 +273,19 @@ async function gerarTextoSaudacaoDiaria(usuario: UsuarioKev): Promise<string> {
       ` conversa com ele(a) há um tempo. Tom: calmo, caloroso, direto, como um amigo/assistente` +
       ` executivo que realmente presta atenção, nunca como um sistema anunciando a hora.`,
     prompt:
-      `Agora é: ${formatarAgoraBrasil()} (horário de Brasília). É um dia novo de conversa com` +
-      ` ${primeiroNome} (vocês já se falaram antes, não é a primeira vez, então NÃO se apresente` +
-      ` de novo nem pergunte apelido de novo). Escreva uma saudação curta de abertura: um` +
-      ` comentário breve e espontâneo sobre o momento atual (dia da semana, horário, se é` +
-      ` madrugada, início ou fim de semana etc.), do jeito que um amigo perceptivo notaria, sem` +
-      ` nunca escrever a data ou hora por extenso. Termine com UMA oferta objetiva de ação.` +
-      ` ${ofertaFinal}\n\n` +
+      `Agora é: ${formatarAgoraBrasil()} (horário de Brasília). Essa é a primeira vez hoje que` +
+      ` ${primeiroNome} entra no sistema, então esse é o primeiro contato do dia entre vocês (mas` +
+      ` vocês já se falaram antes, não é a primeira vez de verdade, então NÃO se apresente de novo` +
+      ` nem pergunte apelido de novo). Escreva uma saudação curta de abertura, com um toque leve` +
+      ` de humor espontâneo (uma observação engraçadinha sobre o dia da semana, o horário, o clima` +
+      ` de segunda/sexta, ou algo do tipo), do jeito que um amigo espirituoso mandaria uma mensagem` +
+      ` de bom dia, sem forçar piada nem exagerar no deboche. Nunca escreva a data ou hora por` +
+      ` extenso. Termine com UMA oferta objetiva de ação. ${ofertaFinal}\n\n` +
       `${REGRAS_ESTILO}\n\n` +
-      `Exemplo do tom certo: "Semana acabou de começar. Gostaria que eu ajude a organizar suas` +
-      ` demandas?" Isso é exemplo de tom, não frase pra copiar. Escreva a sua própria versão,` +
-      ` adaptada ao momento real de agora. Máximo 2 frases curtas. Português do Brasil.`,
+      `Exemplo do tom certo (segunda de manhã): "Bom dia! Segunda-feira chegou sem avisar, como` +
+      ` sempre. Bora ver o que te espera hoje?" Isso é exemplo de tom, não frase pra copiar.` +
+      ` Escreva a sua própria versão, adaptada ao momento real de agora. Máximo 2 frases curtas.` +
+      ` Português do Brasil.`,
   });
   return text;
 }
