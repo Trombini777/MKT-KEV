@@ -5,8 +5,9 @@ import { useTasks } from "@/lib/task-store";
 import { dataParaIso, gerarGradeMes, DIAS_SEMANA_CURTO, NOMES_MESES } from "@/lib/hoje";
 import { nomeTipo, type Tarefa } from "@/lib/mock";
 
-export function CalendarioEditorial() {
-  const tasks = useTasks();
+export function CalendarioEditorial({ tarefas: tarefasProp }: { tarefas?: Tarefa[] } = {}) {
+  const tasksHook = useTasks();
+  const tasks = tarefasProp ?? tasksHook;
   const hoje = new Date();
   const celulas = gerarGradeMes(hoje.getFullYear(), hoje.getMonth());
 

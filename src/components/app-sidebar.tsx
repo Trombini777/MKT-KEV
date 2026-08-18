@@ -6,6 +6,7 @@ import { KevLogo } from "@/components/kev-logo";
 import { NAV_SECTIONS } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 import { useTasks } from "@/lib/task-store";
+import { tarefaContaNoWorkload } from "@/lib/mock";
 
 // Fases que ainda precisam de uma ação humana antes de virar trabalho de verdade — sinalizado
 // como contador na navegação de "Gestão de Tarefas" pra não depender de ninguém lembrar de olhar.
@@ -14,7 +15,10 @@ const FASES_PENDENTES = new Set(["solicitacoes", "triagem"]);
 export function AppSidebar() {
   const pathname = usePathname();
   const tasks = useTasks();
-  const pendentes = tasks.filter((t) => FASES_PENDENTES.has(t.faseAtualId)).length;
+  // Pausada/Arquivada não entram: mesmo numa fase pendente, não é algo que precise de ação agora.
+  const pendentes = tasks.filter(
+    (t) => FASES_PENDENTES.has(t.faseAtualId) && tarefaContaNoWorkload(t)
+  ).length;
 
   return (
     <aside className="flex h-screen w-64 flex-col gap-6 border-r border-border/60 bg-sidebar px-3 py-4">

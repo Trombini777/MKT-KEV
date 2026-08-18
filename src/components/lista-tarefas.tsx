@@ -28,6 +28,7 @@ import {
   faseById,
   nomeTipo,
   type PrioridadeFinal,
+  type Tarefa,
 } from "@/lib/mock";
 
 const PRIORIDADES: PrioridadeFinal[] = ["Crítica", "Alta", "Normal", "Baixa"];
@@ -38,8 +39,9 @@ function formatData(iso: string) {
   return `${dia}/${mes}/${ano}`;
 }
 
-export function ListaTarefas() {
-  const todasTarefas = useTasks();
+export function ListaTarefas({ tarefas: tarefasProp }: { tarefas?: Tarefa[] } = {}) {
+  const tasksHook = useTasks();
+  const todasTarefas = tarefasProp ?? tasksHook;
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();

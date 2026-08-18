@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PersonDayGrid } from "@/components/person-day-grid";
-import { gerarDias, tarefaContaNoWorkload } from "@/lib/mock";
+import { gerarDias, tarefaContaNoWorkload, type Tarefa } from "@/lib/mock";
 import { useTasks } from "@/lib/task-store";
 import { TABS_ATIVO_PRIMARY_CLASS } from "@/lib/utils";
 
@@ -13,6 +13,7 @@ export function WorkloadView({
   diaSelecionado,
   onSelecionarDia,
   mostrarAtividades = false,
+  tarefas: tarefasProp,
 }: {
   title?: string;
   pessoaId?: string;
@@ -21,10 +22,14 @@ export function WorkloadView({
   /** Detalha embaixo da hora as atividades que a compõem — só na grade completa de Gestão de
    * Tarefas, não no resumo do Painel de Trabalho. */
   mostrarAtividades?: boolean;
+  /** Sobrescreve a lista ao vivo (útil quando a página já filtrou por status, ex.: Gestão de
+   * Tarefas) — sem isso, cai no useTasks() padrão. */
+  tarefas?: Tarefa[];
 } = {}) {
   const [intervalo, setIntervalo] = useState("7");
   const dias = useMemo(() => gerarDias(new Date(), Number(intervalo)), [intervalo]);
-  const todasTarefas = useTasks();
+  const tasksHook = useTasks();
+  const todasTarefas = tarefasProp ?? tasksHook;
   const tarefas = useMemo(() => todasTarefas.filter(tarefaContaNoWorkload), [todasTarefas]);
 
   return (
