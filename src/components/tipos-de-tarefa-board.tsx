@@ -9,6 +9,7 @@ import { TipoTarefaSheet } from "@/components/tipo-tarefa-sheet";
 import { ColaboradorAvatar } from "@/components/colaborador-avatar";
 import { cn } from "@/lib/utils";
 import { etapaById, faseById, nomeColaborador, type TipoTarefa } from "@/lib/mock";
+import { decimalParaHorario } from "@/lib/time-format";
 import { useTiposTarefa, adicionarTipoTarefa, editarTipoTarefa } from "@/lib/tipo-tarefa-store";
 import {
   useUnidadesMedida,
@@ -149,7 +150,7 @@ export function TiposDeTarefaBoard() {
                                 : "Sem executor padrão definido",
                               outros > 0 ? `+${outros} outro${outros > 1 ? "s" : ""} podem executar` : null,
                               etapaDoTipo.estimativaHoras != null
-                                ? `${etapaDoTipo.estimativaHoras}h estimadas`
+                                ? `${decimalParaHorario(etapaDoTipo.estimativaHoras)} estimadas`
                                 : null,
                               etapaDoTipo.slaDias ? `SLA de ${etapaDoTipo.slaDias} dia(s)` : null,
                             ]

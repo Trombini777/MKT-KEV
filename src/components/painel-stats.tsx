@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { isoHoje, diasEntre } from "@/lib/hoje";
 import { estaEmRisco, type Tarefa } from "@/lib/mock";
+import { decimalParaHorario } from "@/lib/time-format";
 
 function StatCard({
   label,
@@ -54,7 +55,7 @@ export function PainelStats({
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
       <StatCard label="Etapas hoje" value={tarefasHoje.length} />
       <StatCard label="Atividades" value={totalAtividades} />
-      <StatCard label="Horas hoje" value={`${horasHoje}h`} />
+      <StatCard label="Horas hoje" value={decimalParaHorario(horasHoje)} />
       <StatCard
         label="Atrasadas"
         value={atrasadas}

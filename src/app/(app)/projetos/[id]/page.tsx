@@ -21,15 +21,12 @@ import { useProjetos, useProjetosCarregados, editarProjeto } from "@/lib/projeto
 import { useColaboradores } from "@/lib/colaborador-store";
 import { useTasks } from "@/lib/task-store";
 import { isoHoje } from "@/lib/hoje";
+import { decimalParaHorario } from "@/lib/time-format";
 import { ChevronLeft } from "lucide-react";
 
 function formatData(iso: string) {
   const [ano, mes, dia] = iso.split("-");
   return `${dia}/${mes}/${ano}`;
-}
-
-function formatHoras(horas: number): string {
-  return Number.isInteger(horas) ? `${horas}h` : `${horas.toFixed(1)}h`;
 }
 
 function StatCard({ label, children }: { label: string; children: React.ReactNode }) {
@@ -138,7 +135,7 @@ export default function ProjetoDetalhePage() {
             {atrasadas.length}
           </span>
         </StatCard>
-        <StatCard label="Horas estimadas">{formatHoras(horasEstimadas)}</StatCard>
+        <StatCard label="Horas estimadas">{decimalParaHorario(horasEstimadas)}</StatCard>
       </div>
 
       <Card className="mt-4">

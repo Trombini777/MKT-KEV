@@ -124,6 +124,11 @@ function montarSystemPrompt(
       ` eles, como alguém mandando algumas mensagens curtas seguidas numa conversa de texto. Evite` +
       ` parágrafos longos e densos, mesmo quando a resposta tiver bastante conteúdo. Respostas muito` +
       ` curtas (uma confirmação, uma pergunta rápida) podem ficar num parágrafo só.`,
+    `- Toda quantidade de horas (esforcoHorasPrevisto, somas de horas, qualquer número de horas` +
+      ` retornado por uma ferramenta) sempre em formato de relógio "H:MMh", nunca decimal cru.` +
+      ` Converta: parte inteira antes dos dois pontos, e a parte decimal × 60 (arredondada)` +
+      ` depois, sempre com 2 dígitos. Exemplos: 1.5 vira "1:30h", 0.7 vira "0:42h", 2 vira "2:00h".` +
+      ` Nunca escreva "1.5h", "0.7h" ou qualquer número com ponto decimal seguido de "h".`,
     ``,
     `COMPORTAMENTO: não liste dados brutos, interprete. Em vez de "você tem 3 tarefas atrasadas",` +
       ` diga por que isso importa e o que fazer primeiro: qual delas bloqueia outra coisa, qual é` +
@@ -160,14 +165,16 @@ function montarSystemPrompt(
       ` SOMENTE com este formato exato, numa única mensagem, sem nenhuma saudação, comentário ou` +
       ` explicação antes ou depois:\n\n` +
       `Daily ${primeiroNome} - ${dataCurtaBrasil()}\n\n` +
-      `* [nome da atividade] - [esforcoHorasPrevisto]h\n` +
-      `* [nome da atividade] - [esforcoHorasPrevisto]h\n` +
+      `* [nome da atividade] - [esforcoHorasPrevisto em formato H:MMh]\n` +
+      `* [nome da atividade] - [esforcoHorasPrevisto em formato H:MMh]\n` +
       `(uma linha dessas pra cada atividade retornada por buscarAtividades escopo=minhas` +
       ` filtro=hoje, sem pular linha entre elas)\n\n` +
-      `Horas previstas: [soma de esforcoHorasPrevisto de todas]h\n\n` +
+      `Horas previstas: [soma de esforcoHorasPrevisto de todas, também em formato H:MMh]\n\n` +
       `Use buscarAtividades (escopo=minhas, filtro=hoje) pra montar essa lista. Se uma atividade` +
-      ` não tiver esforcoHorasPrevisto, trate como 0h nessa soma. Nada de texto fora desse` +
-      ` template, nem antes nem depois.`,
+      ` não tiver esforcoHorasPrevisto, trate como 0 nessa soma. Some os valores em decimal` +
+      ` primeiro, só converta pra H:MMh no final (ver regra de formato de horas no ESTILO DE` +
+      ` ESCRITA) — nunca escreva um número com ponto decimal seguido de "h". Nada de texto fora` +
+      ` desse template, nem antes nem depois.`,
     ``,
     `LIMITES: nunca invente dados. Se não tiver informação suficiente ou a ferramenta não cobrir o` +
       ` que foi perguntado, diga isso claramente e ofereça o que você pode verificar.`,

@@ -7,6 +7,7 @@ import { PriorityBadge } from "@/components/priority-badge";
 import { TaskLink } from "@/components/task-link";
 import { cn } from "@/lib/utils";
 import { isoHoje, diasEntre, formatDataCurta } from "@/lib/hoje";
+import { decimalParaHorario } from "@/lib/time-format";
 import { useProjetos } from "@/lib/projeto-store";
 import {
   estaEmRisco,
@@ -160,7 +161,7 @@ function TaskCard({ tarefa }: { tarefa: Tarefa }) {
             "—"
           )}
         </CampoTarefa>
-        <CampoTarefa label="Esforço">{esforco ? `${esforco}h` : "—"}</CampoTarefa>
+        <CampoTarefa label="Esforço">{esforco != null ? decimalParaHorario(esforco) : "—"}</CampoTarefa>
         <CampoTarefa label="BU">
           <TagCampo label={buDaTarefa(tarefa)} className="bg-secondary text-secondary-foreground" />
         </CampoTarefa>

@@ -6,6 +6,7 @@ import { ColaboradorAvatar } from "@/components/colaborador-avatar";
 import { PriorityBadge } from "@/components/priority-badge";
 import { cn } from "@/lib/utils";
 import { isoHoje, diasEntre } from "@/lib/hoje";
+import { decimalParaHorario } from "@/lib/time-format";
 import { useProjetos } from "@/lib/projeto-store";
 import { useConfiguracoesFluxo } from "@/lib/configuracoes-fluxo-store";
 import {
@@ -49,10 +50,6 @@ function primeiraEtapaTipo(
   >((menor, e) => (!menor || e.ordem < menor.ordem ? e : menor), undefined);
   if (!primeira) return undefined;
   return { nome: etapaById(primeira.etapaId)?.nome, slaDias: primeira.slaDias };
-}
-
-function formatHoras(horas: number): string {
-  return Number.isInteger(horas) ? `${horas}h` : `${horas.toFixed(1)}h`;
 }
 
 function buDaTarefa(tarefa: Tarefa): string {
@@ -266,7 +263,7 @@ export function KanbanBoard({
                           {etapaAtual.dataFim
                             ? prazoEtapa.label
                             : proximaEtapa?.slaHoras != null
-                              ? `SLA ${formatHoras(proximaEtapa.slaHoras)}`
+                              ? `SLA ${decimalParaHorario(proximaEtapa.slaHoras)}`
                               : proximaEtapa?.slaDias != null
                                 ? `SLA ${proximaEtapa.slaDias}d`
                                 : "—"}
