@@ -129,16 +129,17 @@ export function AssistantOrb() {
   // enviar()). Também dispara o convite proativo abaixo quando muda pra uma tarefa nova.
   const tarefaFocadaId = useSearchParams().get("tarefa");
 
-  // Refs pra ler o estado mais recente de dentro do .then() do convite proativo sem precisar
-  // colocar `aberto`/`decisaoPendente` nas deps do efeito (que só deve rodar quando a tarefa muda).
+  // Ref pra ler o estado mais recente de dentro do .then() do convite proativo sem precisar
+  // colocar `aberto` nas deps do efeito (que só deve rodar quando a tarefa muda).
   const abertoRef = useRef(aberto);
   useEffect(() => {
     abertoRef.current = aberto;
   }, [aberto]);
-  const decisaoPendenteRef = useRef(decisaoPendente);
-  useEffect(() => {
-    decisaoPendenteRef.current = decisaoPendente;
-  }, [decisaoPendente]);
+
+  // Convite proativo pendente (painel fechado): só um balãozinho perto do mascote com a fala do
+  // keV, não o chat inteiro — ver o efeito de "Convite proativo" abaixo. `null` = nenhum aviso
+  // pendente (ou já resolvido/dispensado).
+  const [convitePendente, setConvitePendente] = useState<{ id: string; texto: string } | null>(null);
 
   // Setado logo antes de abrir o painel pelo convite proativo de tarefa — avisa o efeito abaixo
   // (que normalmente pede a decisão continuar/nova sempre que o painel abre) pra não sobrescrever
@@ -194,7 +195,13 @@ export function AssistantOrb() {
           });
         } else {
           // Sem movimento além do limiar: foi um clique, não um arraste — abre/fecha o chat.
-          setAberto((v) => !v);
+          setAberto((v) => {
+            const novoAberto = !v;
+            // Abrindo o chat (por qualquer caminho) supera o balãozinho pendente — ver
+            // `convitePendente` mais abaixo.
+            if (novoAberto) setConvitePendente(null);
+            return novoAberto;
+          });
         }
       }
 
@@ -284,35 +291,51 @@ export function AssistantOrb() {
 
   // Convite proativo: sempre que o id da tarefa aberta na URL muda pra um valor novo, pergunta ao
   // servidor se essa é a vez do usuário agir nela (etapa atual dele) e se ainda não foi convidado
-  // nessa etapa. Painel fechado (ou ainda na tela de decisão) -> abre e carrega a conversa de hoje
-  // (que já termina com o convite, inserido no servidor). Painel já em conversa -> só acrescenta a
-  // mensagem do convite, sem mexer no que já estava sendo falado.
+  // nessa etapa. Painel já aberto (conversa em andamento) -> só acrescenta a mensagem do convite,
+  // sem mexer no que já estava sendo falado. Painel fechado -> NÃO abre o chat inteiro sozinho:
+  // só mostra um balãozinho perto do mascote com a fala do keV (ver `convitePendente`), que a
+  // pessoa escolhe abrir ou dispensar. A mensagem já fica salva no histórico do servidor de
+  // qualquer forma — só decide o que aparece na tela.
   useEffect(() => {
     if (!tarefaFocadaId) return;
     let cancelado = false;
     avaliarConviteTarefaKev(tarefaFocadaId).then((resultado) => {
       if (cancelado || !resultado.elegivel || resultado.jaConvidado) return;
-      const novaMensagem: UIMessage = {
-        id: resultado.mensagem.id,
-        role: "assistant",
-        parts: [{ type: "text", text: resultado.mensagem.texto }],
-      };
-      if (abertoRef.current && !decisaoPendenteRef.current) {
-        setMessages((atuais) => [...atuais, novaMensagem]);
+      if (abertoRef.current) {
+        const novaMensagem: UIMessage = {
+          id: resultado.mensagem.id,
+          role: "assistant",
+          parts: [{ type: "text", text: resultado.mensagem.texto }],
+        };
+        // Dedup por id: se o "Continuar conversa" já recarregou o histórico (que já inclui esse
+        // convite, inserido no servidor antes de chegar aqui) enquanto essa promise estava em
+        // andamento, não duplica a mesma fala na tela.
+        setMessages((atuais) => (atuais.some((m) => m.id === novaMensagem.id) ? atuais : [...atuais, novaMensagem]));
       } else {
-        if (!abertoRef.current) abrindoPorConviteRef.current = true;
-        setAberto(true);
-        continuarConversa();
+        setConvitePendente({ id: resultado.mensagem.id, texto: resultado.mensagem.texto });
       }
     }).catch((erro) => {
       // Convite proativo é um "a mais", não uma ação que o usuário pediu agora — falha aqui não
-      // deve abrir o painel só pra mostrar um erro. Só registra pra investigação.
+      // deve abrir nada só pra mostrar um erro. Só registra pra investigação.
       if (!cancelado) console.error("Falha ao avaliar convite de tarefa do keV:", erro);
     });
     return () => {
       cancelado = true;
     };
-  }, [tarefaFocadaId, continuarConversa, setMessages]);
+  }, [tarefaFocadaId, setMessages]);
+
+  // Clique no balãozinho: abre o chat já "limpo", só com a fala do convite na tela — sem carregar
+  // o resto da conversa de hoje (isso ficaria visualmente misturado com o assunto da tarefa).
+  const abrirPorConvite = useCallback(async () => {
+    if (!convitePendente) return;
+    abrindoPorConviteRef.current = true;
+    setConvitePendente(null);
+    setDecisaoPendente(false);
+    setMessages([{ id: convitePendente.id, role: "assistant", parts: [{ type: "text", text: convitePendente.texto }] }]);
+    setAberto(true);
+    const novasSugestoes = await obterSugestoesKev();
+    setSugestoes(novasSugestoes);
+  }, [convitePendente, setMessages]);
 
   // Foco no input ao abrir.
   useEffect(() => {
@@ -355,17 +378,34 @@ export function AssistantOrb() {
   // Atalhos somem depois da primeira pergunta do usuário, pra não poluir a conversa.
   const mostrarSugestoes = !digitando && messages.filter((m) => m.role === "user").length === 0;
 
+  // Convite proativo pendente com o chat fechado: mesmo painel de sempre, só que "encolhido" —
+  // sem input, altura só do necessário pra mostrar a fala do keV. Clicar em qualquer parte dele
+  // (fora do X) expande pro chat cheio, já aberto por `abrirPorConvite`.
+  const compacto = !aberto && convitePendente != null;
+
   return (
     <>
-      {/* Painel de chat */}
-      {aberto && (
+      {/* Painel de chat (cheio quando `aberto`, ou "encolhido" só com o convite pendente) */}
+      {(aberto || compacto) && (
         <div
-          role="dialog"
+          role={compacto ? "button" : "dialog"}
+          tabIndex={compacto ? 0 : undefined}
+          onClick={compacto ? abrirPorConvite : undefined}
+          onKeyDown={
+            compacto
+              ? (e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    abrirPorConvite();
+                  }
+                }
+              : undefined
+          }
           aria-label="keV, assistente pessoal de trabalho"
           className={cn(
             "fixed z-[60] flex w-[360px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-3xl border border-border/70 bg-card/95 backdrop-blur-xl",
             "shadow-[0_20px_50px_-12px_rgba(0,0,0,0.35),0_0_18px_-4px_rgba(0,0,0,0.35),0_0_36px_-12px_rgba(0,0,0,0.25)]",
-            "h-[520px] max-h-[calc(100vh-8rem)]",
+            compacto ? "cursor-pointer" : "h-[520px] max-h-[calc(100vh-8rem)]",
           )}
           style={{ animation: "kev-panel-in 0.28s cubic-bezier(0.22,1,0.36,1)", ...estiloPainel(posicao) }}
         >
@@ -380,8 +420,12 @@ export function AssistantOrb() {
             </div>
             <button
               type="button"
-              onClick={() => setAberto(false)}
-              aria-label="Fechar chat"
+              onClick={(e) => {
+                e.stopPropagation();
+                setAberto(false);
+                setConvitePendente(null);
+              }}
+              aria-label={compacto ? "Dispensar aviso do keV" : "Fechar chat"}
               className="grid size-8 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               <X className="size-4" />
@@ -389,6 +433,13 @@ export function AssistantOrb() {
           </div>
 
           {/* Mensagens */}
+          {compacto && convitePendente ? (
+            <div className="px-4 py-4">
+              <div className="max-w-[85%] rounded-2xl rounded-bl-md bg-muted px-3.5 py-2 text-sm leading-relaxed text-foreground">
+                {convitePendente.texto}
+              </div>
+            </div>
+          ) : (
           <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
             {decisaoPendente ? (
               <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
@@ -478,9 +529,10 @@ export function AssistantOrb() {
               </>
             )}
           </div>
+          )}
 
           {/* Input */}
-          {!decisaoPendente && (
+          {!compacto && !decisaoPendente && (
           <div className="border-t border-border/60 p-3">
             {mostrarSugestoes && (
               <div className="mb-2 flex flex-wrap gap-1.5">

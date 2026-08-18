@@ -13,6 +13,11 @@ import type { Tarefa } from "@/lib/mock";
 
 const TAREFA_ID_SCHEMA = z.string().uuid();
 
+// Com `true`, ignora o dedup e convida de novo TODA vez que a atividade é aberta — usado só
+// durante o teste do balãozinho de convite. Em produção fica `false` (comportamento real: convida
+// uma única vez por etapa, via kev_convites_atividade).
+const SEMPRE_CONVIDAR_PARA_TESTE = false;
+
 /**
  * Chave de dedup do convite: a linha `planejamento_etapas` específica em que a tarefa está agora
  * (sobrevive a repetições da mesma etapa mais adiante no fluxo, que gerariam uma nova linha).
@@ -55,14 +60,16 @@ export async function avaliarConviteTarefaKev(tarefaIdBruto: string): Promise<Co
 
   const etapaRef = referenciaEtapaAtual(tarefa);
 
-  // Insere o convite ANTES de gerar a mensagem: é essa linha (com a unique constraint em
-  // colaborador_id+tarefa_id+etapa_ref) que serve de trava atômica contra corrida entre duas
-  // avaliações concorrentes pra mesma etapa (duas abas, ou o efeito disparando duas vezes) — quem
-  // perder a corrida nem chega a chamar o modelo.
-  const { error: erroConvite } = await supabase
-    .from("kev_convites_atividade")
-    .insert({ colaborador_id: usuario.id, tarefa_id: tarefaId, etapa_ref: etapaRef });
-  if (erroConvite) return { elegivel: true, jaConvidado: true };
+  if (!SEMPRE_CONVIDAR_PARA_TESTE) {
+    // Insere o convite ANTES de gerar a mensagem: é essa linha (com a unique constraint em
+    // colaborador_id+tarefa_id+etapa_ref) que serve de trava atômica contra corrida entre duas
+    // avaliações concorrentes pra mesma etapa (duas abas, ou o efeito disparando duas vezes) — quem
+    // perder a corrida nem chega a chamar o modelo.
+    const { error: erroConvite } = await supabase
+      .from("kev_convites_atividade")
+      .insert({ colaborador_id: usuario.id, tarefa_id: tarefaId, etapa_ref: etapaRef });
+    if (erroConvite) return { elegivel: true, jaConvidado: true };
+  }
 
   const primeiroNome = usuario.nome.split(" ")[0];
   const { text } = await generateText({
