@@ -16,17 +16,14 @@ import {
   DIAS_SEMANA_CURTO,
   NOMES_MESES,
 } from "@/lib/hoje";
-import { etapaById, infoEtapaAtual, type EtapaFutura } from "@/lib/mock";
+import { etapaById, infoEtapaAtual, type EtapaFutura, type Tarefa } from "@/lib/mock";
+import { decimalParaHorario } from "@/lib/time-format";
 
 function quandoChega(iso: string): string {
   const dias = diasEntre(isoHoje(), iso);
   if (dias <= 0) return "Hoje";
   if (dias === 1) return "Amanhã";
   return `${formatDataCurta(iso)} · em ${dias} dias`;
-}
-
-function horasCurta(horas: number): string {
-  return Number.isInteger(horas) ? `${horas}h` : `${horas.toFixed(1)}h`;
 }
 
 // Grid de largura fixa por coluna — assim cada campo (etapa atual, seta, minha etapa, esforço,
@@ -96,7 +93,7 @@ function AtividadesFuturasLista({ itens }: { itens: EtapaFutura[] }) {
             </span>
 
             <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline" title="Esforço estimado">
-              {esforco != null ? horasCurta(esforco) : ""}
+              {esforco != null ? decimalParaHorario(esforco) : ""}
             </span>
 
             <span className="shrink-0 text-right text-xs text-muted-foreground">{quandoChega(dataFim)}</span>
@@ -108,10 +105,15 @@ function AtividadesFuturasLista({ itens }: { itens: EtapaFutura[] }) {
 }
 
 function AtividadesFuturasCalendario({
-  itens,
+  todasMinhasEtapas,
   diaSelecionado,
 }: {
-  itens: EtapaFutura[];
+  /** TODAS as etapas atual+futuras da pessoa (todasEtapasDoColaborador) — uma por etapa, sem a
+   * exclusão de "a tarefa já está em Suas atividades" que a lista usa. Só usada aqui no
+   * calendário, pra mostrar a agenda completa (inclusive outra etapa futura numa tarefa cuja
+   * etapa atual também é dela — ex: faz "Cotação" agora e "Contratação" depois, na mesma
+   * tarefa). A Lista continua recebendo `itens` (atividadesEntrandoEmBreve), sem repetir tarefa. */
+  todasMinhasEtapas: EtapaFutura[];
   diaSelecionado?: string | null;
 }) {
   const hoje = new Date();
@@ -138,11 +140,19 @@ function AtividadesFuturasCalendario({
     setMesExibido((atual) => new Date(atual.getFullYear(), atual.getMonth() + delta, 1));
   }
 
-  const itensPorDia = new Map<string, EtapaFutura[]>();
-  for (const item of itens) {
-    const lista = itensPorDia.get(item.dataFim) ?? [];
-    lista.push(item);
-    itensPorDia.set(item.dataFim, lista);
+  // Cada item de `todasMinhasEtapas` é UMA etapa (esforço total) — mas uma etapa que dura vários
+  // dias deve aparecer em CADA dia que ocupa no calendário, com a hora daquele dia específico.
+  const itensPorDia = new Map<string, { tarefa: Tarefa; ordem: number; horasNoDia: number }[]>();
+  for (const item of todasMinhasEtapas) {
+    const etapa = item.tarefa.planejamento?.etapas.find((e) => e.ordem === item.ordem);
+    const diasAlocados = etapa?.alocacoes.length
+      ? etapa.alocacoes
+      : [{ data: item.dataFim, horas: item.esforco ?? 0 }];
+    for (const dia of diasAlocados) {
+      const lista = itensPorDia.get(dia.data) ?? [];
+      lista.push({ tarefa: item.tarefa, ordem: item.ordem, horasNoDia: dia.horas });
+      itensPorDia.set(dia.data, lista);
+    }
   }
 
   const celulas = gerarGradeMes(mesExibido.getFullYear(), mesExibido.getMonth());
@@ -207,15 +217,15 @@ function AtividadesFuturasCalendario({
                   </span>
                 )}
               </div>
-              {itensDoDia.slice(0, 3).map(({ tarefa, ordem, esforco }) => {
+              {itensDoDia.map(({ tarefa, ordem, horasNoDia }) => {
                 const minhaEtapa = etapaById(
                   tarefa.planejamento?.etapas.find((e) => e.ordem === ordem)?.etapaId ?? ""
                 );
                 const nomeEtapa = minhaEtapa?.nome ?? "—";
-                const tooltip = `${nomeEtapa}: ${tarefa.titulo}${esforco != null ? ` (${horasCurta(esforco)})` : ""}`;
+                const tooltip = `${nomeEtapa}: ${tarefa.titulo} (${decimalParaHorario(horasNoDia)} nesse dia)`;
                 return (
                   <TaskLink
-                    key={`${tarefa.id}-${ordem}`}
+                    key={`${tarefa.id}-${ordem}-${dataParaIso(data)}`}
                     taskId={tarefa.id}
                     title={tooltip}
                     className="truncate rounded bg-primary px-1.5 py-0.5 text-[0.68rem] font-medium text-primary-foreground hover:bg-primary/85"
@@ -224,11 +234,6 @@ function AtividadesFuturasCalendario({
                   </TaskLink>
                 );
               })}
-              {itensDoDia.length > 3 && (
-                <span className="px-1.5 text-[0.65rem] text-muted-foreground">
-                  +{itensDoDia.length - 3}
-                </span>
-              )}
             </div>
           );
         })}
@@ -244,9 +249,15 @@ function AtividadesFuturasCalendario({
  */
 export function AtividadesEntrandoEmBreve({
   itens,
+  todasMinhasEtapas,
   diaSelecionado,
 }: {
   itens: EtapaFutura[];
+  /** TODAS as etapas atual+futuras da pessoa (todasEtapasDoColaborador) — só entra na aba
+   * Calendário, pra mostrar a agenda completa (atual + futuras) num lugar só, sem a exclusão de
+   * "tarefa já está em Suas atividades" que a Lista usa (a etapa atual já tem lista própria acima,
+   * "Suas atividades", no Painel de Trabalho). */
+  todasMinhasEtapas: EtapaFutura[];
   /** Dia (iso) selecionado no Workload do Painel de Trabalho — só tem efeito na visão de
    * calendário (navega até o mês dele e destaca a célula, sem esconder os outros dias). */
   diaSelecionado?: string | null;
@@ -286,7 +297,7 @@ export function AtividadesEntrandoEmBreve({
       {visualizacao === "lista" ? (
         <AtividadesFuturasLista itens={itens} />
       ) : (
-        <AtividadesFuturasCalendario itens={itens} diaSelecionado={diaSelecionado} />
+        <AtividadesFuturasCalendario todasMinhasEtapas={todasMinhasEtapas} diaSelecionado={diaSelecionado} />
       )}
     </div>
   );

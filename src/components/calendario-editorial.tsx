@@ -10,12 +10,28 @@ export function CalendarioEditorial() {
   const hoje = new Date();
   const celulas = gerarGradeMes(hoje.getFullYear(), hoje.getMonth());
 
+  // Cada tarefa aparece em TODOS os dias entre dataInicio e prazo (não só no dia do prazo) —
+  // assim o calendário mostra o período inteiro em que a tarefa está aberta. Tarefa sem
+  // dataInicio ainda definida (ex.: aguardando triagem) ou com intervalo inválido cai no
+  // comportamento antigo: aparece só no dia do prazo.
   const tarefasPorDia = new Map<string, Tarefa[]>();
   for (const t of tasks) {
     if (!t.prazo) continue;
-    const lista = tarefasPorDia.get(t.prazo) ?? [];
-    lista.push(t);
-    tarefasPorDia.set(t.prazo, lista);
+    if (!t.dataInicio || t.prazo < t.dataInicio) {
+      const lista = tarefasPorDia.get(t.prazo) ?? [];
+      lista.push(t);
+      tarefasPorDia.set(t.prazo, lista);
+      continue;
+    }
+    const [anoIni, mesIni, diaIni] = t.dataInicio.split("-").map(Number);
+    const cursor = new Date(anoIni, mesIni - 1, diaIni);
+    while (dataParaIso(cursor) <= t.prazo) {
+      const iso = dataParaIso(cursor);
+      const lista = tarefasPorDia.get(iso) ?? [];
+      lista.push(t);
+      tarefasPorDia.set(iso, lista);
+      cursor.setDate(cursor.getDate() + 1);
+    }
   }
 
   const hojeIso = dataParaIso(hoje);

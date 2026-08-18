@@ -650,6 +650,11 @@ export type EtapaFutura = { tarefa: Tarefa; ordem: number; dataFim: string; esfo
  * caso ela já está em `tarefasParaExecutarAgora` (a pessoa já pode agir agora), e repetir a
  * mesma tarefa em "Entrando em breve" (por causa de uma etapa futura, também dela) confundia
  * mais do que ajudava.
+ *
+ * Sempre UM item por etapa (não um por dia alocado) — é o que a lista, o badge de contagem e a
+ * tool buscarAtividadesFuturas do keV esperam. Uma etapa que dura vários dias ainda aparece só
+ * aqui como um item só, com o esforço total; quem precisa espalhar por dia (o calendário) faz
+ * isso lendo `tarefa.planejamento.etapas[...].alocacoes` diretamente, sem mudar essa lista.
  */
 export function atividadesEntrandoEmBreve(colaboradorId: string, tarefas: Tarefa[] = TAREFAS): EtapaFutura[] {
   const resultado: EtapaFutura[] = [];
@@ -667,6 +672,29 @@ export function atividadesEntrandoEmBreve(colaboradorId: string, tarefas: Tarefa
           ? proxima.alocacoes.reduce((soma, a) => soma + a.horas, 0)
           : undefined;
       resultado.push({ tarefa: t, ordem: proxima.ordem, dataFim: proxima.dataFim, esforco });
+    }
+  }
+  return resultado.sort((a, b) => a.dataFim.localeCompare(b.dataFim));
+}
+
+/**
+ * TODAS as etapas atual + futuras (uma por etapa, não só a próxima) atribuídas a `colaboradorId`
+ * em qualquer tarefa — sem a exclusão de "a tarefa já está em tarefasParaExecutarAgora" que
+ * `atividadesEntrandoEmBreve` tem. Essa exclusão faz sentido pra lista (evita repetir a mesma
+ * tarefa), mas esconde etapas futuras reais quando a pessoa também é dona da etapa atual da
+ * mesma tarefa (ex: ela faz a "Cotação" agora e também vai fazer a "Contratação" depois — a
+ * Contratação nunca aparecia em lugar nenhum). Usada só pelo calendário de atividades futuras,
+ * que quer mostrar a agenda completa da pessoa, não uma lista sem repetição.
+ */
+export function todasEtapasDoColaborador(colaboradorId: string, tarefas: Tarefa[] = TAREFAS): EtapaFutura[] {
+  const resultado: EtapaFutura[] = [];
+  for (const t of tarefas) {
+    if (!t.planejamento) continue;
+    for (const e of t.planejamento.etapas) {
+      if (e.colaboradorId !== colaboradorId) continue;
+      if (e.ordem < t.planejamento.etapaAtualOrdem) continue; // já concluída
+      const esforco = e.alocacoes.length > 0 ? e.alocacoes.reduce((soma, a) => soma + a.horas, 0) : undefined;
+      resultado.push({ tarefa: t, ordem: e.ordem, dataFim: e.dataFim, esforco });
     }
   }
   return resultado.sort((a, b) => a.dataFim.localeCompare(b.dataFim));

@@ -1,14 +1,16 @@
 import { Fragment, useState } from "react";
 import { ColaboradorAvatar } from "@/components/colaborador-avatar";
+import { TaskLink } from "@/components/task-link";
 import { cn } from "@/lib/utils";
 import {
   COLABORADORES,
   capacidadeDiaria,
-  horasAlocadasPorDia,
+  itensAlocadosPorDia,
   nivelCarga,
   type DiaGrade,
   type Tarefa,
 } from "@/lib/mock";
+import { decimalParaHorario } from "@/lib/time-format";
 
 const NIVEL_CLASSES: Record<string, string> = {
   good: "bg-success/10 text-success",
@@ -24,6 +26,7 @@ export function PersonDayGrid({
   tarefas,
   diaSelecionado,
   onSelecionarDia,
+  mostrarAtividades = false,
 }: {
   dias: DiaGrade[];
   overrides?: Record<string, string>;
@@ -35,6 +38,10 @@ export function PersonDayGrid({
   /** Presente só quando o clique no dia deve filtrar algo (Painel de Trabalho) — sem isso, a
    * grade fica só informativa, sem hover/clique nos dias. */
   onSelecionarDia?: (iso: string) => void;
+  /** Lista, embaixo da hora de cada célula, as atividades que compõem aquele total — só faz
+   * sentido na grade completa (Workload dentro de Gestão de Tarefas). No Workload resumido do
+   * Painel de Trabalho a célula mostra só a hora, sem detalhar. */
+  mostrarAtividades?: boolean;
 }) {
   const [diaEmFoco, setDiaEmFoco] = useState<string | null>(null);
   const colaboradoresAtivos = COLABORADORES.filter(
@@ -77,7 +84,8 @@ export function PersonDayGrid({
               <span className="truncate">{colaborador.nome.split(" ")[0]}</span>
             </div>
             {dias.map((dia) => {
-              const horas = horasAlocadasPorDia(colaborador.id, dia.iso, overrides, tarefas);
+              const itens = itensAlocadosPorDia(colaborador.id, dia.iso, overrides, tarefas);
+              const horas = itens.reduce((soma, item) => soma + item.horas, 0);
               const nivel = dia.fimDeSemana ? "off" : nivelCarga(horas, capacidade);
               const selecionado = dia.iso === diaSelecionado;
               return (
@@ -89,14 +97,31 @@ export function PersonDayGrid({
                   onMouseLeave={() => interativo && setDiaEmFoco((atual) => (atual === dia.iso ? null : atual))}
                   onClick={() => onSelecionarDia?.(dia.iso)}
                   className={cn(
-                    "flex h-9 items-center justify-center rounded-md text-xs font-medium transition-colors",
+                    "flex flex-col items-center gap-1 rounded-md p-1 text-xs font-medium transition-colors",
+                    mostrarAtividades ? "min-h-9" : "h-9 justify-center",
                     NIVEL_CLASSES[nivel],
                     interativo && "cursor-pointer",
                     selecionado && "ring-2 ring-primary ring-offset-1 ring-offset-background"
                   )}
-                  title={`${horas}h alocadas de ${capacidade}h`}
+                  title={`${decimalParaHorario(horas)} alocadas de ${decimalParaHorario(capacidade)}`}
                 >
-                  {horas > 0 ? `${horas}h` : dia.fimDeSemana ? "" : "-"}
+                  <span className="flex h-5 items-center">
+                    {horas > 0 ? decimalParaHorario(horas) : dia.fimDeSemana ? "" : "-"}
+                  </span>
+                  {mostrarAtividades && itens.length > 0 && (
+                    <div className="flex w-full flex-col gap-0.5" onClick={(e) => e.stopPropagation()}>
+                      {itens.map((item, i) => (
+                        <TaskLink
+                          key={`${item.tarefa.id}-${i}`}
+                          taskId={item.tarefa.id}
+                          title={`${item.etapaNome}: ${item.tarefa.titulo} (${decimalParaHorario(item.horas)} nesse dia)`}
+                          className="block truncate rounded bg-background/60 px-1 py-0.5 text-left text-[0.65rem] font-medium text-foreground hover:bg-background/90"
+                        >
+                          {item.etapaNome}: {item.tarefa.titulo}
+                        </TaskLink>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}

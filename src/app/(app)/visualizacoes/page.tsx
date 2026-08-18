@@ -76,7 +76,7 @@ export default function VisualizacoesPage() {
           <CalendarioEditorial />
         </TabsContent>
         <TabsContent value="workload" className="mt-4">
-          <WorkloadView />
+          <WorkloadView mostrarAtividades />
         </TabsContent>
       </Tabs>
     </div>

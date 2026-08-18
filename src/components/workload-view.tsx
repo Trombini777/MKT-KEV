@@ -12,11 +12,15 @@ export function WorkloadView({
   pessoaId,
   diaSelecionado,
   onSelecionarDia,
+  mostrarAtividades = false,
 }: {
   title?: string;
   pessoaId?: string;
   diaSelecionado?: string | null;
   onSelecionarDia?: (iso: string) => void;
+  /** Detalha embaixo da hora as atividades que a compõem — só na grade completa de Gestão de
+   * Tarefas, não no resumo do Painel de Trabalho. */
+  mostrarAtividades?: boolean;
 } = {}) {
   const [intervalo, setIntervalo] = useState("7");
   const dias = useMemo(() => gerarDias(new Date(), Number(intervalo)), [intervalo]);
@@ -53,6 +57,7 @@ export function WorkloadView({
         tarefas={tarefas}
         diaSelecionado={diaSelecionado}
         onSelecionarDia={onSelecionarDia}
+        mostrarAtividades={mostrarAtividades}
       />
     </div>
   );

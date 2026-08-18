@@ -16,6 +16,7 @@ import {
   ordenarPorPrioridadeEPrazo,
   tarefasParaExecutarAgora,
   atividadesEntrandoEmBreve,
+  todasEtapasDoColaborador,
   tarefasComAlocacaoNoDia,
   tarefaContaNoWorkload,
   type Colaborador,
@@ -38,6 +39,7 @@ export function PainelDeTrabalho({ usuario }: { usuario: Colaborador }) {
 
   const minhasExecucoesTodas = ordenarPorPrioridadeEPrazo(tarefasParaExecutarAgora(usuario.id, tarefas));
   const entrandoEmBreve = atividadesEntrandoEmBreve(usuario.id, tarefas);
+  const todasMinhasEtapas = todasEtapasDoColaborador(usuario.id, tarefas);
 
   const minhasExecucoes = diaSelecionado
     ? tarefasComAlocacaoNoDia(minhasExecucoesTodas, diaSelecionado)
@@ -81,7 +83,11 @@ export function PainelDeTrabalho({ usuario }: { usuario: Colaborador }) {
       </section>
 
       <section className="mt-8">
-        <AtividadesEntrandoEmBreve itens={entrandoEmBreve} diaSelecionado={diaSelecionado} />
+        <AtividadesEntrandoEmBreve
+          itens={entrandoEmBreve}
+          todasMinhasEtapas={todasMinhasEtapas}
+          diaSelecionado={diaSelecionado}
+        />
       </section>
 
       <p className="mt-6 text-xs text-muted-foreground">{colaboradores.length} pessoas no time.</p>
