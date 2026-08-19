@@ -162,13 +162,18 @@ function montarSystemPrompt(
       ` buscarAtividades: o prazo final da tarefa E o prazo da etapa atual. Uma tarefa pode ter o` +
       ` prazo final tranquilo mas a etapa em que está agora vencendo hoje, ou vice-versa. Quando as` +
       ` duas datas importarem, deixe claro qual é qual (ex: "o prazo final é dia 20, mas a etapa de` +
-      ` Revisão Interna em que ela está agora vence hoje"). Ao listar atividades de alguém, sempre` +
-      ` mencione o esforço previsto (esforcoHorasPrevisto) de cada uma quando disponível, pra` +
-      ` responder de forma completa quando perguntarem quanto tempo está previsto pra cada` +
-      ` entrega, não só o título e o prazo.`,
+      ` Revisão Interna em que ela está agora vence hoje"). Existe ainda um TERCEIRO sinal,` +
+      ` independente das duas datas: horasAlocadasHojeNaEtapaAtual. Uma etapa longa (várias horas` +
+      ` espalhadas por vários dias) pode ter horas de HOJE mesmo com o prazo dela só daqui a dias —` +
+      ` isso É trabalho de hoje, mesmo sem nenhum prazo bater com hoje, e não deve ser ignorado só` +
+      ` porque nenhuma data "vence hoje". Ao listar atividades de alguém, sempre mencione o esforço` +
+      ` previsto (esforcoHorasPrevisto) de cada uma quando disponível, pra responder de forma` +
+      ` completa quando perguntarem quanto tempo está previsto pra cada entrega, não só o título e` +
+      ` o prazo.`,
     ``,
-    `METODOLOGIA para perguntas amplas (ex: "como está meu dia", "o que eu preciso saber", "me dá` +
-      ` um panorama"): não responda com uma tool só. Monte o cenário completo antes de responder:\n` +
+    `METODOLOGIA para perguntas amplas (ex: "como está meu dia", "o que eu tenho hoje", "o que eu` +
+      ` tenho pra hoje", "o que eu preciso saber", "me dá um panorama"): não responda com uma tool` +
+      ` só. Monte o cenário completo antes de responder:\n` +
       `1. Levante o que já é seu agora (buscarAtividades escopo=minhas, filtro=hoje e/ou` +
       ` atrasadas) e o que está em aprovação pendente.\n` +
       `2. Levante o que vai cair pra você em breve (buscarAtividadesFuturas) e note com quem cada` +
@@ -308,7 +313,7 @@ export async function POST(req: Request) {
     etapaId: string;
     colaboradorId: string | null;
     dataFim: string | null;
-    alocacoes: { horas: number }[] | null;
+    alocacoes: { data: string; horas: number }[] | null;
   };
   type PlanejamentoRow = { etapaAtualOrdem: number; etapas: PlanejamentoEtapaRow[] };
   type TarefaRow = {
@@ -326,6 +331,18 @@ export async function POST(req: Request) {
   };
 
   const nomeProjeto = (p: TarefaRow["projeto"]) => (Array.isArray(p) ? p[0]?.nome : p?.nome);
+
+  // Quantas horas da etapa ATUAL (não da tarefa toda) caem especificamente no dia `diaIso` —
+  // diferente de `esforcoHoras` (soma de todos os dias da etapa). Uma etapa pode vencer só daqui a
+  // dias mas já ter horas de hoje alocadas nela (etapa longa, distribuída dia a dia) — isso conta
+  // como "trabalho de hoje" mesmo sem nenhum prazo bater com hoje, mesma lógica do Workload real
+  // (ver horasAlocadasPorDia em @/lib/mock/workload.ts).
+  function horasAlocadasHojeNaEtapaAtual(t: TarefaRow, diaIso: string): number {
+    const planejamento = Array.isArray(t.planejamento) ? t.planejamento[0] : t.planejamento;
+    const atual = planejamento?.etapas?.find((e) => e.ordem === planejamento.etapaAtualOrdem);
+    if (!atual?.alocacoes) return 0;
+    return atual.alocacoes.filter((a) => a.data === diaIso).reduce((soma, a) => soma + a.horas, 0);
+  }
 
   // "Prazo final da tarefa" (tarefas.prazo) e "prazo da etapa atual" (o que a UI mostra como
   // "Executar etapa até") são datas diferentes — uma tarefa pode ter o prazo final só daqui a
@@ -362,8 +379,10 @@ export async function POST(req: Request) {
           "inclui tarefas já concluídas. Cada atividade tem DUAS datas possíveis: o prazo final " +
           "da tarefa inteira e o prazo da etapa atual dela (o que a UI chama de 'Executar etapa " +
           "até') — elas podem ser bem diferentes, uma tarefa com prazo final distante pode ter a " +
-          "etapa atual vencendo hoje. Cada atividade também traz esforcoHorasPrevisto: quantas " +
-          "horas estão previstas/alocadas para a etapa atual dela. Use para responder sobre " +
+          "etapa atual vencendo hoje. Cada atividade também traz esforcoHorasPrevisto (soma de " +
+          "TODOS os dias da etapa atual) e horasAlocadasHojeNaEtapaAtual (só a fatia de hoje) — " +
+          "uma etapa longa pode ter horas de hoje mesmo com o prazo dela só daqui a dias; isso " +
+          "também é 'trabalho de hoje', não só o que vence hoje. Use para responder sobre " +
           "prazos, atrasos, aprovações pendentes, atividades paradas há muito tempo, ou quanto " +
           "tempo está previsto para o trabalho de alguém, de qualquer pessoa ou de todo o time. " +
           "Escopo=minhas traz só o que JÁ é a etapa atual do usuário (considerando o responsável " +
@@ -377,8 +396,10 @@ export async function POST(req: Request) {
             .enum(["atrasadas", "hoje", "aprovacao_pendente", "paradas", "todas"])
             .describe(
               "atrasadas = prazo final OU prazo da etapa atual já passou; hoje = prazo final OU" +
-                " etapa atual vence hoje; aprovacao_pendente = está na fase de aprovação; paradas" +
-                ` = sem atualização há mais de ${DIAS_PARA_CONSIDERAR_PARADA} dias; todas = todas as ativas`
+                " etapa atual vence hoje OU a etapa atual já tem horas alocadas pra hoje (mesmo" +
+                " que o prazo dela seja outro dia); aprovacao_pendente = está na fase de" +
+                ` aprovação; paradas = sem atualização há mais de ${DIAS_PARA_CONSIDERAR_PARADA}` +
+                ` dias; todas = todas as ativas`
             ),
         }),
         execute: async ({ escopo, filtro }) => {
@@ -391,7 +412,7 @@ export async function POST(req: Request) {
                   " participantesIds:participantes_ids, projetoId:projeto_id, projeto:projetos(nome)," +
                   " planejamento:planejamentos(etapaAtualOrdem:etapa_atual_ordem," +
                   " etapas:planejamento_etapas(ordem, etapaId:etapa_id, colaboradorId:colaborador_id," +
-                  " dataFim:data_fim, alocacoes:planejamento_alocacoes(horas)))"
+                  " dataFim:data_fim, alocacoes:planejamento_alocacoes(data, horas)))"
               )
               .neq("fase_atual_id", "concluido")
               .not("status", "in", '("Pausada","Arquivada")'),
@@ -413,7 +434,8 @@ export async function POST(req: Request) {
             const prazoEtapa = etapaAtualDe(t).dataFim;
             if (filtro === "atrasadas")
               return (!!t.prazo && t.prazo < hoje) || (!!prazoEtapa && prazoEtapa < hoje);
-            if (filtro === "hoje") return t.prazo === hoje || prazoEtapa === hoje;
+            if (filtro === "hoje")
+              return t.prazo === hoje || prazoEtapa === hoje || horasAlocadasHojeNaEtapaAtual(t, hoje) > 0;
             if (filtro === "aprovacao_pendente") return t.faseAtualId === "aprovacao";
             if (filtro === "paradas")
               return diasEntre(t.atualizadoEm.slice(0, 10), hoje) >= DIAS_PARA_CONSIDERAR_PARADA;
@@ -437,6 +459,7 @@ export async function POST(req: Request) {
                 fase: t.faseAtualId,
                 etapaAtual: etapaId ? nomeEtapaPorId.get(etapaId) : undefined,
                 esforcoHorasPrevisto: esforcoHoras,
+                horasAlocadasHojeNaEtapaAtual: horasAlocadasHojeNaEtapaAtual(t, hoje) || undefined,
                 prazoFinalTarefa: t.prazo || "sem prazo",
                 prazoFinalAtrasado: !!t.prazo && t.prazo < hoje,
                 prazoEtapaAtual: prazoEtapa || undefined,
