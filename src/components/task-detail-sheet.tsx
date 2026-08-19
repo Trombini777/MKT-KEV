@@ -61,6 +61,7 @@ import {
   destinosPermitidos,
   TIPOS_TAREFA,
   COLABORADORES,
+  colaboradorEhOperacional,
   type Tarefa,
   type HistoricoEvento,
 } from "@/lib/mock";
@@ -249,6 +250,10 @@ export function TaskDetailSheet() {
       </Dialog>
     );
   }
+
+  // "Não operacional" não deve aparecer como opção pra assumir/receber uma etapa — continua
+  // acessando o sistema pra visualizar, só não entra como executor em lugar nenhum.
+  const colaboradoresOperacionais = COLABORADORES.filter(colaboradorEhOperacional);
 
   const fase = faseById(tarefa.faseAtualId);
   // No Backlog o card só está esperando a data de início (ver sincronizarInicioDeTarefas) — o
@@ -832,7 +837,7 @@ export function TaskDetailSheet() {
                     </div>
                   ) : atribuindoResponsavel ? (
                     <Select
-                      items={Object.fromEntries(COLABORADORES.map((c) => [c.id, c.nome]))}
+                      items={Object.fromEntries(colaboradoresOperacionais.map((c) => [c.id, c.nome]))}
                       onValueChange={(cid) => {
                         if (typeof cid === "string" && cid) {
                           atribuirResponsavelEtapa(tarefa.id, tarefa.faseAtualId, cid);
@@ -844,7 +849,7 @@ export function TaskDetailSheet() {
                         <SelectValue placeholder="Selecionar colaborador" />
                       </SelectTrigger>
                       <SelectContent>
-                        {COLABORADORES.map((c) => (
+                        {colaboradoresOperacionais.map((c) => (
                           <SelectItem key={c.id} value={c.id}>
                             {c.nome}
                           </SelectItem>
@@ -916,7 +921,7 @@ export function TaskDetailSheet() {
                       </div>
                     ) : atribuindoResponsavel ? (
                       <Select
-                        items={Object.fromEntries(COLABORADORES.map((c) => [c.id, c.nome]))}
+                        items={Object.fromEntries(colaboradoresOperacionais.map((c) => [c.id, c.nome]))}
                         onValueChange={(cid) => {
                           if (typeof cid === "string" && cid) {
                             atribuirResponsavelEtapa(tarefa.id, tarefa.faseAtualId, cid);
@@ -928,7 +933,7 @@ export function TaskDetailSheet() {
                           <SelectValue placeholder="Selecionar colaborador" />
                         </SelectTrigger>
                         <SelectContent>
-                          {COLABORADORES.map((c) => (
+                          {colaboradoresOperacionais.map((c) => (
                             <SelectItem key={c.id} value={c.id}>
                               {c.nome}
                             </SelectItem>
@@ -1422,7 +1427,7 @@ export function TaskDetailSheet() {
                                 Trocar executor
                               </p>
                               <div className="flex max-h-64 flex-col gap-0.5 overflow-y-auto">
-                                {COLABORADORES.map((c) => (
+                                {colaboradoresOperacionais.map((c) => (
                                   <button
                                     key={c.id}
                                     type="button"

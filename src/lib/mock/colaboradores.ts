@@ -78,3 +78,11 @@ export const COLABORADORES: Colaborador[] = [
     avatarIniciais: "JC",
   },
 ];
+
+/** "Não operacional" = pessoa do time que não executa trabalho de verdade no sistema (diferente
+ * de Ativo/Em Licença/Férias/Inativo) — continua acessando a plataforma normalmente pra
+ * visualizar, mas não deve aparecer como opção de executor em nenhuma tela (atribuir/reatribuir
+ * responsável, executor padrão de tipo de tarefa, planejamento) nem entrar na grade de Workload. */
+export function colaboradorEhOperacional(c: Colaborador): boolean {
+  return c.status !== "Não operacional";
+}

@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ColaboradorAvatar } from "@/components/colaborador-avatar";
-import { COLABORADORES } from "@/lib/mock";
+import { COLABORADORES, colaboradorEhOperacional } from "@/lib/mock";
 import { horarioParaDecimal, decimalParaHorarioInput } from "@/lib/time-format";
 import {
   obterConfiguracoesFluxo,
@@ -102,6 +102,8 @@ function CampoHoras({
  * todos os campos juntos falha por inteiro e derruba até os campos que teriam funcionado.
  */
 export function ResponsaveisPadraoFluxo() {
+  // "Não operacional" não aparece como opção de responsável padrão.
+  const colaboradoresOperacionais = COLABORADORES.filter(colaboradorEhOperacional);
   const [config, setConfig] = useState<ConfiguracoesFluxo>(CONFIG_VAZIA);
   const [rascunho, setRascunho] = useState<ConfiguracoesFluxo>(CONFIG_VAZIA);
   const [carregado, setCarregado] = useState(false);
@@ -196,6 +198,9 @@ export function ResponsaveisPadraoFluxo() {
                   <TableCell className="font-medium whitespace-nowrap">{linha.label}</TableCell>
                   <TableCell>
                     <Select
+                      // `items` alimenta o label do valor selecionado — lista completa pra manter o
+                      // nome de quem já era responsável padrão mesmo se virar "Não operacional"; as
+                      // opções do dropdown continuam restritas abaixo.
                       items={Object.fromEntries(COLABORADORES.map((c) => [c.id, c.nome]))}
                       value={linha.responsavelId}
                       onValueChange={(v) => {
@@ -212,7 +217,7 @@ export function ResponsaveisPadraoFluxo() {
                         <SelectValue placeholder="Ninguém definido" />
                       </SelectTrigger>
                       <SelectContent>
-                        {COLABORADORES.map((c) => (
+                        {colaboradoresOperacionais.map((c) => (
                           <SelectItem key={c.id} value={c.id}>
                             {c.nome}
                           </SelectItem>

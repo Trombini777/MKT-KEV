@@ -41,6 +41,7 @@ import {
 } from "@/lib/scheduling";
 import {
   COLABORADORES,
+  colaboradorEhOperacional,
   etapaById,
   tipoById,
   horasAlocadasPorDia,
@@ -118,6 +119,9 @@ export function PlanejamentoRecomendado({
   const tarefasParaCapacidade = modoReplanejamento
     ? tarefasLive.filter((t) => t.id !== tarefa.id)
     : tarefasLive;
+  // "Não operacional" não aparece como opção de executor aqui — continua vendo o sistema, só não
+  // entra como escolha pra assumir uma etapa.
+  const colaboradoresOperacionais = COLABORADORES.filter(colaboradorEhOperacional);
   const tipo = tipoById(tarefa.tipoId);
   const planejamentoExistente = modoReplanejamento ? tarefa.planejamento : undefined;
   const etapaAtualOrdem = planejamentoExistente?.etapaAtualOrdem ?? 1;
@@ -502,6 +506,10 @@ export function PlanejamentoRecomendado({
                       </div>
                     ) : (
                       <Select
+                        // `items` alimenta o label do valor selecionado — usa a lista completa (não só
+                        // operacionais) pra continuar mostrando o nome de quem já estava atribuído
+                        // antes de virar "Não operacional"; as opções abertas no dropdown (abaixo)
+                        // continuam restritas aos operacionais.
                         items={Object.fromEntries(COLABORADORES.map((c) => [c.id, c.nome]))}
                         value={linha.colaboradorId}
                         onValueChange={(v) =>
@@ -519,7 +527,7 @@ export function PlanejamentoRecomendado({
                           <SelectValue placeholder="Escolher" />
                         </SelectTrigger>
                         <SelectContent>
-                          {COLABORADORES.map((c) => (
+                          {colaboradoresOperacionais.map((c) => (
                             <SelectItem key={c.id} value={c.id}>
                               {c.nome}
                             </SelectItem>

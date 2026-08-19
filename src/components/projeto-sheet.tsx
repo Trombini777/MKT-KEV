@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/select";
 import { DEPARTAMENTOS } from "@/lib/departamentos";
 import { useColaboradores } from "@/lib/colaborador-store";
-import type { Projeto, StatusProjeto } from "@/lib/mock";
+import { colaboradorEhOperacional, type Projeto, type StatusProjeto } from "@/lib/mock";
 
 const STATUS_OPCOES: StatusProjeto[] = ["Planejado", "Ativo", "Concluído", "Cancelado"];
 
@@ -46,6 +46,10 @@ export function ProjetoSheet({
   onOpenChange?: (open: boolean) => void;
 }) {
   const colaboradores = useColaboradores();
+  // "Não operacional" não aparece como opção de responsável — só a exibição do já escolhido
+  // (SelectValue abaixo) continua olhando a lista inteira, pra mostrar certo mesmo se a pessoa
+  // já escolhida virou não operacional depois.
+  const colaboradoresOperacionais = colaboradores.filter(colaboradorEhOperacional);
   const editando = !!projetoParaEditar;
   const controlado = openControlado !== undefined;
   const [openInterno, setOpenInterno] = useState(false);
@@ -190,7 +194,7 @@ export function ProjetoSheet({
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {colaboradores.map((c) => (
+                  {colaboradoresOperacionais.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.nome}
                     </SelectItem>

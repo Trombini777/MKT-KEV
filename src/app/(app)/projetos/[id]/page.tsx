@@ -17,7 +17,12 @@ import {
 import { TaskListRow } from "@/components/task-list-row";
 import { StatusProjetoEditor } from "@/components/status-projeto-editor";
 import { NovaAtividadeDialog } from "@/components/nova-atividade-dialog";
-import { colaboradorById, horasEstimadasTarefa, type StatusProjeto } from "@/lib/mock";
+import {
+  colaboradorById,
+  colaboradorEhOperacional,
+  horasEstimadasTarefa,
+  type StatusProjeto,
+} from "@/lib/mock";
 import { useProjetos, useProjetosCarregados, editarProjeto } from "@/lib/projeto-store";
 import { useColaboradores } from "@/lib/colaborador-store";
 import { useTasks, recarregarTarefas } from "@/lib/task-store";
@@ -48,6 +53,8 @@ export default function ProjetoDetalhePage() {
   const projetos = useProjetos();
   const carregado = useProjetosCarregados();
   const colaboradores = useColaboradores();
+  // "Não operacional" não aparece como opção de responsável.
+  const colaboradoresOperacionais = colaboradores.filter(colaboradorEhOperacional);
   const todasAsTarefas = useTasks();
   const projeto = projetos.find((p) => p.id === id);
   const [notas, setNotas] = useState<string | undefined>(undefined);
@@ -116,7 +123,7 @@ export default function ProjetoDetalhePage() {
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              {colaboradores.map((c) => (
+              {colaboradoresOperacionais.map((c) => (
                 <SelectItem key={c.id} value={c.id}>
                   {c.nome}
                 </SelectItem>

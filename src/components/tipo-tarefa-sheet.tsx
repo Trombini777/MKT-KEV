@@ -49,6 +49,7 @@ import { useEtapas } from "@/lib/etapa-store";
 import { horarioParaDecimal, decimalParaHorario, decimalParaHorarioInput } from "@/lib/time-format";
 import {
   COLABORADORES,
+  colaboradorEhOperacional,
   etapaById,
   type EtapaDoTipo,
   type TipoTarefa,
@@ -354,6 +355,8 @@ export function TipoTarefaSheet({
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }) {
+  // "Não operacional" não aparece como opção de executor padrão nem de outros executores.
+  const colaboradoresOperacionais = COLABORADORES.filter(colaboradorEhOperacional);
   const editando = !!tipoParaEditar;
   const controlado = openControlado !== undefined;
   const [openInterno, setOpenInterno] = useState(false);
@@ -650,9 +653,9 @@ export function TipoTarefaSheet({
                             id: String(e.ordem),
                             label: `${e.ordem}. ${etapaById(e.etapaId)?.nome ?? "—"}`,
                           }));
-                        const opcoesExecutores = COLABORADORES.filter(
-                          (c) => c.id !== etapaDoTipo.executorPadraoId
-                        ).map((c) => ({ id: c.id, label: c.nome }));
+                        const opcoesExecutores = colaboradoresOperacionais
+                          .filter((c) => c.id !== etapaDoTipo.executorPadraoId)
+                          .map((c) => ({ id: c.id, label: c.nome }));
                         return (
                           <TableRow key={etapaDoTipo.ordem}>
                             <TableCell>
@@ -685,6 +688,9 @@ export function TipoTarefaSheet({
                             </TableCell>
                             <TableCell>
                               <Select
+                                // `items` alimenta o label do valor selecionado — lista completa pra
+                                // manter o nome de quem já era executor padrão mesmo se virar "Não
+                                // operacional"; as opções do dropdown continuam restritas abaixo.
                                 items={Object.fromEntries(COLABORADORES.map((c) => [c.id, c.nome]))}
                                 value={etapaDoTipo.executorPadraoId ?? ""}
                                 onValueChange={(v) =>
@@ -703,7 +709,7 @@ export function TipoTarefaSheet({
                                   <SelectValue placeholder="Escolher" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {COLABORADORES.map((c) => (
+                                  {colaboradoresOperacionais.map((c) => (
                                     <SelectItem key={c.id} value={c.id}>
                                       {c.nome}
                                     </SelectItem>

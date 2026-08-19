@@ -16,12 +16,15 @@ import {
   inicioDaSemana,
   tarefasPorFase,
   COLABORADORES,
+  colaboradorEhOperacional,
 } from "@/lib/mock";
 import { CheckCircle2 } from "lucide-react";
 
 export function PlanejamentoSemanal() {
   const dias = useMemo(() => gerarDias(inicioDaSemana(new Date()), 7), []);
   const backlog = tarefasPorFase("backlog");
+  // "Não operacional" não aparece como opção pra alocar tarefa do backlog.
+  const colaboradoresOperacionais = COLABORADORES.filter(colaboradorEhOperacional);
 
   const [overrides, setOverrides] = useState<Record<string, string>>({});
   const [tarefaSelecionada, setTarefaSelecionada] = useState<string>("");
@@ -63,7 +66,7 @@ export function PlanejamentoSemanal() {
                 <SelectValue placeholder="Colaborador" />
               </SelectTrigger>
               <SelectContent>
-                {COLABORADORES.map((c) => (
+                {colaboradoresOperacionais.map((c) => (
                   <SelectItem key={c.id} value={c.id}>
                     {c.nome}
                   </SelectItem>

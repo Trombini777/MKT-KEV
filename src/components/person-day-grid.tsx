@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import {
   COLABORADORES,
   capacidadeDiaria,
+  colaboradorEhOperacional,
   itensAlocadosPorDia,
   nivelCarga,
   type DiaGrade,
@@ -44,8 +45,13 @@ export function PersonDayGrid({
   mostrarAtividades?: boolean;
 }) {
   const [diaEmFoco, setDiaEmFoco] = useState<string | null>(null);
+  // O filtro de "não operacional" só vale pra grade geral (todo o time) — quando um colaborador
+  // específico é pedido (ex.: o próprio Painel de Trabalho da pessoa), ela deve aparecer mesmo
+  // sendo "Não operacional", já que continua acessando a plataforma normalmente.
   const colaboradoresAtivos = COLABORADORES.filter(
-    (c) => c.status !== "Inativo" && (!colaboradorId || c.id === colaboradorId)
+    (c) =>
+      c.status !== "Inativo" &&
+      (colaboradorId ? c.id === colaboradorId : colaboradorEhOperacional(c))
   );
   const interativo = onSelecionarDia != null;
 

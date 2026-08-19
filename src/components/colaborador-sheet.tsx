@@ -25,7 +25,13 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { SQUADS, type Colaborador, type StatusColaborador } from "@/lib/mock";
 
-const STATUS_OPCOES: StatusColaborador[] = ["Ativo", "Em Licença", "Inativo"];
+const STATUS_OPCOES: StatusColaborador[] = [
+  "Ativo",
+  "Em Licença",
+  "Férias",
+  "Não operacional",
+  "Inativo",
+];
 
 // Ordem hierárquica de cima pra baixo — do mais sênior pro mais júnior. Times são todos de
 // Marketing, então o cargo já vem com o sufixo — evita duplicidade tipo "Superintendente" (aqui)
@@ -111,7 +117,7 @@ export function ColaboradorSheet({
   }
 
   function salvar() {
-    if (!nome.trim() || !squadId) return;
+    if (!nome.trim()) return;
     const dados: Colaborador = {
       id: colaboradorParaEditar?.id ?? `colaborador-${Date.now()}`,
       nome: nome.trim(),
@@ -242,7 +248,7 @@ export function ColaboradorSheet({
               </Select>
             </div>
             <div className="flex flex-col gap-2">
-              <Label>Squad</Label>
+              <Label>Squad (opcional)</Label>
               <Select value={squadId} onValueChange={(v) => v && setSquadId(v)}>
                 <SelectTrigger className="h-9 w-full">
                   <SelectValue placeholder="Selecione">
@@ -341,7 +347,7 @@ export function ColaboradorSheet({
           ) : (
             <span />
           )}
-          <Button onClick={salvar} disabled={!nome.trim() || !squadId || enviandoFoto}>
+          <Button onClick={salvar} disabled={!nome.trim() || enviandoFoto}>
             {editando ? "Salvar alterações" : "Cadastrar membro"}
           </Button>
         </DialogFooter>

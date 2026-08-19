@@ -1,6 +1,6 @@
 import type { Departamento } from "../departamentos";
 
-export type StatusColaborador = "Ativo" | "Em Licença" | "Inativo";
+export type StatusColaborador = "Ativo" | "Em Licença" | "Férias" | "Não operacional" | "Inativo";
 
 export type Colaborador = {
   id: string;

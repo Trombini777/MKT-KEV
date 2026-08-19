@@ -31,7 +31,7 @@ function paraLinha(c: Partial<Colaborador>) {
     skills: c.skills,
     capacidade_horas_semana: c.capacidadeHorasSemana,
     status: c.status,
-    squad_id: c.squadId,
+    squad_id: c.squadId || null,
     avatar_iniciais: c.avatarIniciais,
     avatar_url: c.avatarUrl ?? null,
   };
