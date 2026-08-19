@@ -6,6 +6,7 @@ import { KevLogo } from "@/components/kev-logo";
 import { Check, Inbox } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { AtividadeFormFields, type DadosAtividade } from "@/components/atividade-form-fields";
+import { enviarEmailsNovaSolicitacao } from "@/lib/email-solicitacao";
 
 function CabecalhoSolicitacao({ mostrarDescricao }: { mostrarDescricao: boolean }) {
   return (
@@ -49,6 +50,16 @@ export function SolicitacaoForm() {
       console.error("Falha ao enviar solicitação:", error.message);
       return { erro: "Não foi possível enviar sua solicitação. Tente novamente." };
     }
+    // Best-effort, sem bloquear a tela de confirmação: a solicitação já foi registrada acima, o
+    // e-mail é só um aviso a mais — uma falha aqui não deve fazer a pessoa achar que o pedido dela
+    // não foi recebido.
+    enviarEmailsNovaSolicitacao({
+      titulo: dados.titulo,
+      solicitanteNome: dados.solicitanteNome,
+      solicitanteEmail: dados.solicitanteEmail,
+      departamento: dados.departamento,
+      prazo: dados.prazo || null,
+    }).catch((erroEmail) => console.error("Falha ao disparar e-mails da solicitação:", erroEmail));
     setSubmitted(true);
   }
 
