@@ -1,4 +1,4 @@
-import type { Tarefa } from "./types";
+import type { EtapaAgendadaAplicada, Tarefa } from "./types";
 
 export const TAREFAS: Tarefa[] = [
   {
@@ -721,17 +721,28 @@ export function horasEstimadasTarefa(tarefa: Tarefa): number {
  * concluída, ou o plano já passou de todas as etapas mas a fase ainda não migrou pra "concluido")
  * ou, sem planejamento aplicado ainda, o executor legado da fase atual. Usado pro card de tarefa
  * e pelo filtro de executor de Gestão de Tarefas. */
-export function executorAtualDaTarefa(tarefa: Tarefa): string | undefined {
-  if (tarefa.planejamento) {
-    const { etapas, etapaAtualOrdem } = tarefa.planejamento;
-    const maxOrdem = etapas.reduce((max, e) => Math.max(max, e.ordem), 0);
-    const planoFinalizado = etapaAtualOrdem > maxOrdem;
-    if (tarefa.faseAtualId === "concluido" || planoFinalizado) {
-      const ultima = etapas.reduce((max, e) => (e.ordem > max.ordem ? e : max), etapas[0]);
-      return ultima?.colaboradorId;
-    }
-    return etapas.find((e) => e.ordem === etapaAtualOrdem)?.colaboradorId;
+/**
+ * Etapa "atual" do planejamento aplicado, pra exibição — usada por qualquer lugar que mostre
+ * executor/etapa/prazo de uma tarefa com plano (Kanban, Lista, filtros etc.). Trata o caso de
+ * plano finalizado (etapaAtualOrdem passou da última etapa real, ex.: plano de 1 etapa só) mas a
+ * tarefa ainda não migrou pra fase "concluido" — sem isso, tarefas nesse estado ficam sem
+ * etapa/executor porque nenhuma etapa bate com o `ordem` procurado.
+ */
+export function etapaAtualDoPlanejamento(tarefa: Tarefa): EtapaAgendadaAplicada | undefined {
+  if (!tarefa.planejamento) return undefined;
+  const { etapas, etapaAtualOrdem } = tarefa.planejamento;
+  const maxOrdem = etapas.reduce((max, e) => Math.max(max, e.ordem), 0);
+  const planoFinalizado = etapaAtualOrdem > maxOrdem;
+  if (tarefa.faseAtualId === "concluido" || planoFinalizado) {
+    return etapas.reduce((max, e) => (e.ordem > max.ordem ? e : max), etapas[0]);
   }
+  return etapas.find((e) => e.ordem === etapaAtualOrdem);
+}
+
+export function executorAtualDaTarefa(tarefa: Tarefa): string | undefined {
+  const atual = etapaAtualDoPlanejamento(tarefa);
+  if (atual) return atual.colaboradorId;
+  if (tarefa.planejamento) return undefined;
   return tarefa.executoresPorFase[tarefa.faseAtualId]?.[0];
 }
 

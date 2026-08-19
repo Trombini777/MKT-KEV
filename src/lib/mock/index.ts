@@ -16,6 +16,7 @@ import { COLABORADORES } from "./colaboradores";
 import { TIPOS_TAREFA } from "./tipos";
 import { ETAPAS } from "./etapas";
 import { TAGS } from "./tags";
+import { etapaAtualDoPlanejamento } from "./tarefas";
 import type { EtapaTarefa, Tarefa } from "./types";
 
 export function colaboradorById(id: string) {
@@ -60,21 +61,17 @@ export function infoEtapaAtual(tarefa: Tarefa): {
   dataFim: string | undefined;
   esforco: number | undefined;
 } {
-  if (tarefa.planejamento) {
-    const atual = tarefa.planejamento.etapas.find(
-      (e) => e.ordem === tarefa.planejamento!.etapaAtualOrdem
-    );
-    if (atual) {
-      return {
-        nome: ETAPAS.find((e) => e.id === atual.etapaId)?.nome,
-        executorId: atual.colaboradorId,
-        dataFim: atual.dataFim,
-        esforco:
-          atual.alocacoes.length > 0
-            ? atual.alocacoes.reduce((soma, a) => soma + a.horas, 0)
-            : undefined,
-      };
-    }
+  const atual = etapaAtualDoPlanejamento(tarefa);
+  if (atual) {
+    return {
+      nome: ETAPAS.find((e) => e.id === atual.etapaId)?.nome,
+      executorId: atual.colaboradorId,
+      dataFim: atual.dataFim,
+      esforco:
+        atual.alocacoes.length > 0
+          ? atual.alocacoes.reduce((soma, a) => soma + a.horas, 0)
+          : undefined,
+    };
   }
   return {
     nome: etapaTarefaAtual(tarefa)?.nome,
