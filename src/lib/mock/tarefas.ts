@@ -717,6 +717,24 @@ export function horasEstimadasTarefa(tarefa: Tarefa): number {
   return Object.values(tarefa.estimativaPorFase).reduce((soma, h) => soma + (h ?? 0), 0);
 }
 
+/** Quem executa a tarefa agora: a etapa atual (planejamento em andamento), a última etapa (já
+ * concluída, ou o plano já passou de todas as etapas mas a fase ainda não migrou pra "concluido")
+ * ou, sem planejamento aplicado ainda, o executor legado da fase atual. Usado pro card de tarefa
+ * e pelo filtro de executor de Gestão de Tarefas. */
+export function executorAtualDaTarefa(tarefa: Tarefa): string | undefined {
+  if (tarefa.planejamento) {
+    const { etapas, etapaAtualOrdem } = tarefa.planejamento;
+    const maxOrdem = etapas.reduce((max, e) => Math.max(max, e.ordem), 0);
+    const planoFinalizado = etapaAtualOrdem > maxOrdem;
+    if (tarefa.faseAtualId === "concluido" || planoFinalizado) {
+      const ultima = etapas.reduce((max, e) => (e.ordem > max.ordem ? e : max), etapas[0]);
+      return ultima?.colaboradorId;
+    }
+    return etapas.find((e) => e.ordem === etapaAtualOrdem)?.colaboradorId;
+  }
+  return tarefa.executoresPorFase[tarefa.faseAtualId]?.[0];
+}
+
 export function progressoProjeto(projetoId: string): number {
   const tarefas = tarefasDoProjeto(projetoId);
   if (tarefas.length === 0) return 0;

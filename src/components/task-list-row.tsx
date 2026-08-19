@@ -2,7 +2,13 @@ import { ColaboradorAvatar } from "@/components/colaborador-avatar";
 import { PriorityBadge } from "@/components/priority-badge";
 import { TaskLink } from "@/components/task-link";
 import { cn } from "@/lib/utils";
-import { nomeTipo, nomeColaborador, estaEmRisco, horasEstimadasTarefa } from "@/lib/mock";
+import {
+  nomeTipo,
+  nomeColaborador,
+  estaEmRisco,
+  horasEstimadasTarefa,
+  executorAtualDaTarefa,
+} from "@/lib/mock";
 import type { StatusAtividade, Tarefa } from "@/lib/mock";
 import { decimalParaHorario } from "@/lib/time-format";
 import { isoHoje } from "@/lib/hoje";
@@ -20,28 +26,10 @@ const STATUS_ATIVIDADE_CLASSES: Record<StatusAtividade, string> = {
   Arquivada: "bg-muted text-muted-foreground",
 };
 
-/** Quem executou por último: a etapa atual (planejamento em andamento), a última etapa (já
- * concluída, ou o plano já passou de todas as etapas mas a fase da tarefa ainda não migrou pra
- * "concluido" — mesmo critério de `planoFinalizado` em task-detail-sheet.tsx) ou, sem
- * planejamento aplicado ainda, o executor legado da fase atual. */
-function executorDaTarefa(tarefa: Tarefa): string | undefined {
-  if (tarefa.planejamento) {
-    const { etapas, etapaAtualOrdem } = tarefa.planejamento;
-    const maxOrdem = etapas.reduce((max, e) => Math.max(max, e.ordem), 0);
-    const planoFinalizado = etapaAtualOrdem > maxOrdem;
-    if (tarefa.faseAtualId === "concluido" || planoFinalizado) {
-      const ultima = etapas.reduce((max, e) => (e.ordem > max.ordem ? e : max), etapas[0]);
-      return ultima?.colaboradorId;
-    }
-    return etapas.find((e) => e.ordem === etapaAtualOrdem)?.colaboradorId;
-  }
-  return tarefa.executoresPorFase[tarefa.faseAtualId]?.[0];
-}
-
 export function TaskListRow({ tarefa }: { tarefa: Tarefa }) {
   const emRisco = estaEmRisco(tarefa);
   const concluida = tarefa.faseAtualId === "concluido";
-  const executorId = executorDaTarefa(tarefa);
+  const executorId = executorAtualDaTarefa(tarefa);
   const horasPrevistas = horasEstimadasTarefa(tarefa);
 
   // Data em que o card entrou na fase "concluido" — último evento de histórico que registra essa

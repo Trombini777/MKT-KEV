@@ -1,12 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { ListFilter } from "lucide-react";
+import { ListFilter, UserRound } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { PageHeader } from "@/components/page-header";
@@ -17,34 +20,59 @@ import { WorkloadView } from "@/components/workload-view";
 import { NovaAtividadeDialog } from "@/components/nova-atividade-dialog";
 import { cn } from "@/lib/utils";
 import { isoHoje, diasEntre } from "@/lib/hoje";
+import { ehTimeDeTecnologia } from "@/lib/kev-cargo";
 import { useTasks, moveTask, recarregarTarefas } from "@/lib/task-store";
 import { useEtapas } from "@/lib/etapa-store";
 import { useColaboradores } from "@/lib/colaborador-store";
 import { useTiposTarefa } from "@/lib/tipo-tarefa-store";
-import type { StatusAtividade } from "@/lib/mock";
+import { executorAtualDaTarefa, type StatusAtividade } from "@/lib/mock";
 
 const TODOS_STATUS: StatusAtividade[] = ["Ativa", "Pausada", "Concluída", "Arquivada"];
 
 export default function VisualizacoesPage() {
   const todasTarefas = useTasks();
-  // KanbanBoard/ListaTarefas leem etapaById/nomeColaborador/nomeTipo direto (sem hook) —
-  // assinar aqui garante que a página re-renderize assim que esses catálogos hidratarem do
-  // Supabase.
+  const colaboradores = useColaboradores();
+  // KanbanBoard/ListaTarefas leem etapaById/nomeTipo direto (sem hook) — assinar aqui garante que
+  // a página re-renderize assim que esses catálogos hidratarem do Supabase.
   useEtapas();
-  useColaboradores();
   useTiposTarefa();
 
   // Só "Ativa" marcada por padrão — os outros status (Pausada, Concluída, Arquivada) ficam fora
   // até a pessoa marcar explicitamente que quer vê-los também. Vale pras 4 visões (Kanban, Lista,
   // Calendário, Workload), que recebem essa mesma lista já filtrada.
   const [statusSelecionados, setStatusSelecionados] = useState<StatusAtividade[]>(["Ativa"]);
-  const tasks = todasTarefas.filter((t) => statusSelecionados.includes(t.statusAtividade));
 
   function alternarFiltro(status: StatusAtividade, marcado: boolean) {
     setStatusSelecionados((atuais) =>
       marcado ? [...atuais, status] : atuais.filter((s) => s !== status)
     );
   }
+
+  // Filtro de executor: todo mundo marcado por padrão, exceto o time de tecnologia (não são do
+  // marketing, não têm tarefas de verdade — ver ehTimeDeTecnologia). `null` = a pessoa ainda não
+  // mexeu no filtro — nesse caso o padrão é derivado direto do catálogo de colaboradores a cada
+  // render (em vez de sincronizado via useEffect), então já nasce certo assim que hidratar.
+  const [executoresSelecionados, setExecutoresSelecionados] = useState<string[] | null>(null);
+  const colaboradoresTime = colaboradores.filter((c) => !ehTimeDeTecnologia(c.cargo));
+  const colaboradoresTecnologia = colaboradores.filter((c) => ehTimeDeTecnologia(c.cargo));
+  const executoresPadrao = colaboradoresTime.map((c) => c.id);
+  const executoresAtivos = executoresSelecionados ?? executoresPadrao;
+
+  function alternarExecutor(id: string, marcado: boolean) {
+    setExecutoresSelecionados((atuais) => {
+      const base = atuais ?? executoresPadrao;
+      return marcado ? [...base, id] : base.filter((x) => x !== id);
+    });
+  }
+
+  const tasksPorStatus = todasTarefas.filter((t) => statusSelecionados.includes(t.statusAtividade));
+  const tasks = tasksPorStatus.filter((t) => {
+    // Colaboradores ainda hidratando do Supabase: não filtra por executor ainda, senão toda
+    // tarefa com executor some da tela até o catálogo carregar (executoresAtivos ficaria vazio).
+    if (colaboradores.length === 0) return true;
+    const executorId = executorAtualDaTarefa(t);
+    return !executorId || executoresAtivos.includes(executorId);
+  });
 
   // Filtro adicional (Total / Em dia / Atrasadas), independente do de status acima — clicar num
   // deles mostra só aquele recorte nas 4 visões, igual ao seletor de Kanban/Lista/Calendário/
@@ -119,6 +147,46 @@ export default function VisualizacoesPage() {
                   {status}
                 </DropdownMenuCheckboxItem>
               ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger className="flex h-8 items-center gap-1.5 rounded-full border border-border bg-background px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted">
+              <UserRound className="size-3.5" />
+              Executor
+              {executoresSelecionados !== null && (
+                <span className="grid size-4 place-items-center rounded-full bg-primary text-[0.65rem] font-semibold text-primary-foreground">
+                  {executoresAtivos.length}
+                </span>
+              )}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              {colaboradoresTime.map((c) => (
+                <DropdownMenuCheckboxItem
+                  key={c.id}
+                  checked={executoresAtivos.includes(c.id)}
+                  onCheckedChange={(marcado) => alternarExecutor(c.id, marcado)}
+                >
+                  {c.nome}
+                </DropdownMenuCheckboxItem>
+              ))}
+              {colaboradoresTecnologia.length > 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel>Time de tecnologia</DropdownMenuLabel>
+                    {colaboradoresTecnologia.map((c) => (
+                      <DropdownMenuCheckboxItem
+                        key={c.id}
+                        checked={executoresAtivos.includes(c.id)}
+                        onCheckedChange={(marcado) => alternarExecutor(c.id, marcado)}
+                      >
+                        {c.nome}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                  </DropdownMenuGroup>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
 
