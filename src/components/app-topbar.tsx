@@ -4,6 +4,7 @@ import { LogOut } from "lucide-react";
 import { ColaboradorAvatar } from "@/components/colaborador-avatar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { logout } from "@/lib/auth";
+import { resetarCachesDeSessao } from "@/lib/session-cache";
 import type { Colaborador } from "@/lib/mock";
 
 export function AppTopbar({ usuarioAtual }: { usuarioAtual: Colaborador | null }) {
@@ -22,7 +23,15 @@ export function AppTopbar({ usuarioAtual }: { usuarioAtual: Colaborador | null }
             <span className="text-sm font-medium">{usuarioAtual.nome}</span>
           </div>
         )}
-        <form action={logout}>
+        <form
+          action={logout}
+          onSubmit={() => {
+            // Mesmo motivo do login (ver login-form.tsx): sem reload de página nessa navegação,
+            // os caches client-side precisam ser descartados aqui pra não sobreviver pro próximo
+            // login nessa mesma aba.
+            resetarCachesDeSessao();
+          }}
+        >
           <button
             type="submit"
             className="text-muted-foreground hover:text-foreground"

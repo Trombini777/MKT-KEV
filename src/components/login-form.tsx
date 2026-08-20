@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { login } from "@/lib/auth";
+import { resetarCachesDeSessao } from "@/lib/session-cache";
 
 const FIELD_LABEL_CLASS = "text-xs font-semibold tracking-wider text-muted-foreground uppercase";
 
@@ -16,6 +17,11 @@ export function LoginForm() {
     event.preventDefault();
     setErro(null);
     setIsSubmitting(true);
+    // `login` faz redirect() no servidor — navegação client-side, sem reload do bundle — então
+    // qualquer cache client-side (equipe, tarefas, identidade do colaborador atual) da sessão
+    // anterior no mesmo navegador precisa ser descartado ANTES de logar, senão a pessoa que
+    // acabou de entrar pode herdar dado de quem estava logado antes até um reload manual.
+    resetarCachesDeSessao();
     const formData = new FormData(event.currentTarget);
     const resultado = await login(
       String(formData.get("email")),

@@ -3,6 +3,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { ETAPAS, type EtapaTarefa } from "@/lib/mock";
 import { createClient } from "@/lib/supabase/client";
+import { registrarResetDeSessao } from "@/lib/session-cache";
 
 // Diferente dos outros stores (que reatribuem a variável), aqui mutamos o array ETAPAS *no
 // próprio lugar* (push/splice) — assim quem importa `ETAPAS`/`etapaById` direto (ex.:
@@ -25,12 +26,19 @@ async function hidratar() {
   const { data, error } = await supabase.from("etapas").select("id, nome, categoria").order("nome");
   if (error) {
     console.error("Falha ao carregar etapas:", error.message);
+    hidratado = false;
     return;
   }
   ETAPAS.length = 0;
   ETAPAS.push(...((data ?? []) as EtapaTarefa[]));
   emit();
 }
+
+// Só destrava a flag — ver comentário equivalente em colaborador-store.ts sobre por que não
+// refazer a busca eagerly aqui.
+registrarResetDeSessao(() => {
+  hidratado = false;
+});
 
 function subscribe(listener: () => void) {
   listeners.add(listener);

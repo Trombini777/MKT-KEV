@@ -29,6 +29,7 @@ import { SELECT_TAREFA as SELECT, linhaParaTarefa } from "@/lib/tarefa-mapper";
 import { createClient } from "@/lib/supabase/client";
 import { obterColaboradorAtual } from "@/lib/current-colaborador-client";
 import { obterConfiguracoesFluxo } from "@/lib/configuracoes-fluxo";
+import { registrarResetDeSessao } from "@/lib/session-cache";
 
 type SupabaseClient = ReturnType<typeof createClient>;
 
@@ -151,7 +152,7 @@ async function sincronizarInicioDeTarefas() {
  * mutators daqui (ex.: a RPC `criar_solicitacao_publica`, chamada direto pelo dialog de nova
  * atividade), pra essa mudança aparecer na tela sem precisar recarregar a página.
  */
-export async function recarregarTarefas() {
+export async function recarregarTarefas(): Promise<boolean> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("tarefas")
@@ -159,18 +160,31 @@ export async function recarregarTarefas() {
     .order("criado_em", { ascending: false });
   if (error) {
     console.error("Falha ao carregar tarefas:", error.message);
-    return;
+    return false;
   }
   tasks = (data ?? []).map(linhaParaTarefa);
   emit();
+  return true;
 }
 
 async function hidratar() {
   if (hidratado) return;
   hidratado = true;
-  await recarregarTarefas();
+  const ok = await recarregarTarefas();
+  if (!ok) {
+    // Falha pontual (ex.: RLS ainda sem sessão válida no instante do login) não pode travar essa
+    // store vazia pra sempre nessa aba — a próxima tentativa precisa poder refazer a busca.
+    hidratado = false;
+    return;
+  }
   await sincronizarInicioDeTarefas();
 }
+
+// Só destrava a flag — ver comentário equivalente em colaborador-store.ts sobre por que não
+// refazer a busca eagerly aqui.
+registrarResetDeSessao(() => {
+  hidratado = false;
+});
 
 function subscribe(listener: () => void) {
   listeners.add(listener);

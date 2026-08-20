@@ -3,6 +3,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { DEPARTAMENTOS as SEED } from "@/lib/departamentos";
 import { createClient } from "@/lib/supabase/client";
+import { registrarResetDeSessao } from "@/lib/session-cache";
 
 // Só leitura (sem tela de gestão — ver docs/PRD.md E1) — mas ainda assim busca do Supabase, não
 // do array estático, porque a lista está incompleta hoje (18 de ~29) e pode ser completada
@@ -23,11 +24,18 @@ async function hidratar() {
   const { data, error } = await supabase.from("departamentos").select("nome").order("nome");
   if (error || !data || data.length === 0) {
     console.error("Falha ao carregar departamentos, usando lista embutida:", error?.message);
+    hidratado = false;
     return;
   }
   departamentos = data.map((d) => d.nome);
   emit();
 }
+
+// Só destrava a flag — ver comentário equivalente em colaborador-store.ts sobre por que não
+// refazer a busca eagerly aqui.
+registrarResetDeSessao(() => {
+  hidratado = false;
+});
 
 function subscribe(listener: () => void) {
   listeners.add(listener);

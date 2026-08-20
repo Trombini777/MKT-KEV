@@ -6,6 +6,7 @@ import {
   CONFIG_VAZIA,
   type ConfiguracoesFluxo,
 } from "@/lib/configuracoes-fluxo";
+import { registrarResetDeSessao } from "@/lib/session-cache";
 
 // Mesmo padrão de etapa-store.ts/projeto-store.ts, só que sem mutar um array — aqui é um objeto
 // singleton (config global). Existe pra o card do Kanban conseguir mostrar o SLA padrão de
@@ -34,6 +35,12 @@ export async function recarregarConfiguracoesFluxo() {
   snapshot = config;
   emit();
 }
+
+// Só destrava a flag — ver comentário equivalente em colaborador-store.ts sobre por que não
+// refazer a busca eagerly aqui.
+registrarResetDeSessao(() => {
+  hidratado = false;
+});
 
 function subscribe(listener: () => void) {
   listeners.add(listener);

@@ -3,6 +3,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { type UnidadeMedida } from "@/lib/mock";
 import { createClient } from "@/lib/supabase/client";
+import { registrarResetDeSessao } from "@/lib/session-cache";
 
 let unidades: UnidadeMedida[] = [];
 let hidratado = false;
@@ -19,11 +20,18 @@ async function hidratar() {
   const { data, error } = await supabase.from("unidades_medida").select("id, nome").order("nome");
   if (error) {
     console.error("Falha ao carregar unidades de medida:", error.message);
+    hidratado = false;
     return;
   }
   unidades = data ?? [];
   emit();
 }
+
+// Só destrava a flag — ver comentário equivalente em colaborador-store.ts sobre por que não
+// refazer a busca eagerly aqui.
+registrarResetDeSessao(() => {
+  hidratado = false;
+});
 
 function subscribe(listener: () => void) {
   listeners.add(listener);

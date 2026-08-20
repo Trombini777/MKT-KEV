@@ -3,6 +3,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { TIPOS_TAREFA, type TipoTarefa, type EtapaDoTipo } from "@/lib/mock";
 import { createClient } from "@/lib/supabase/client";
+import { registrarResetDeSessao } from "@/lib/session-cache";
 
 // Igual ao etapa-store.ts/colaborador-store.ts: muta TIPOS_TAREFA *no próprio lugar* — assim
 // quem lê direto (visualizacoes/page.tsx, task-detail-sheet.tsx, lista-tarefas.tsx) continua
@@ -59,12 +60,19 @@ async function hidratar() {
   const { data, error } = await supabase.from("tipos_tarefa").select(SELECT).order("nome");
   if (error) {
     console.error("Falha ao carregar tipos de tarefa:", error.message);
+    hidratado = false;
     return;
   }
   TIPOS_TAREFA.length = 0;
   TIPOS_TAREFA.push(...(data ?? []).map(linhaParaTipo));
   emit();
 }
+
+// Só destrava a flag — ver comentário equivalente em colaborador-store.ts sobre por que não
+// refazer a busca eagerly aqui.
+registrarResetDeSessao(() => {
+  hidratado = false;
+});
 
 function subscribe(listener: () => void) {
   listeners.add(listener);

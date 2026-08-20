@@ -3,6 +3,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { COLABORADORES, type Colaborador } from "@/lib/mock";
 import { createClient } from "@/lib/supabase/client";
+import { registrarResetDeSessao } from "@/lib/session-cache";
 
 // Mesmo padrão de hooks/mutators de antes (ver docs/PLAN.md M2), só que agora lendo/escrevendo
 // direto no Supabase (protegido por RLS) em vez de localStorage. Igual ao etapa-store.ts, muta
@@ -44,12 +45,26 @@ async function hidratar() {
   const { data, error } = await supabase.from("colaboradores").select(SELECT).order("nome");
   if (error) {
     console.error("Falha ao carregar colaboradores:", error.message);
+    // Sem isso, uma falha pontual (ex.: RLS ainda sem sessão válida no instante do login) trava
+    // essa store no mock/seed pra sempre nessa aba — a próxima tentativa (novo mount ou reset de
+    // sessão) precisa poder tentar de novo.
+    hidratado = false;
     return;
   }
   COLABORADORES.length = 0;
   COLABORADORES.push(...((data ?? []) as unknown as Colaborador[]));
   emit();
 }
+
+// Só destrava a flag — não refaz a busca aqui. `login()`/`logout()` são Server Actions (sem
+// reload), então esse reset roda antes de a sessão nova (ou nenhuma) estar de fato ativa no
+// navegador; disparar `hidratar()` agora buscaria com a sessão errada — e, sem sessão, o RLS
+// devolve lista vazia sem erro (não cai no `catch` que reseta a flag), travando a store vazia de
+// novo. O próximo mount de `useColaboradores()` (já na página autenticada, pós-redirect) refaz a
+// busca com a sessão certa.
+registrarResetDeSessao(() => {
+  hidratado = false;
+});
 
 function subscribe(listener: () => void) {
   listeners.add(listener);

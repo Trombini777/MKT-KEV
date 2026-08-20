@@ -3,6 +3,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { PROJETOS, type Projeto } from "@/lib/mock";
 import { createClient } from "@/lib/supabase/client";
+import { registrarResetDeSessao } from "@/lib/session-cache";
 
 // Mesmo padrão do etapa-store.ts/colaborador-store.ts: muta o array PROJETOS *no próprio lugar*
 // assim que hidrata do Supabase, assim quem lê direto via `projetoById` (kanban, detalhe da
@@ -47,6 +48,7 @@ async function hidratar() {
   const { data, error } = await supabase.from("projetos").select(SELECT).order("nome");
   if (error) {
     console.error("Falha ao carregar projetos:", error.message);
+    hidratando = false;
     carregado = true;
     emit();
     return;
@@ -56,6 +58,12 @@ async function hidratar() {
   carregado = true;
   emit();
 }
+
+// Só destrava a flag — ver comentário equivalente em colaborador-store.ts sobre por que não
+// refazer a busca eagerly aqui.
+registrarResetDeSessao(() => {
+  hidratando = false;
+});
 
 function subscribe(listener: () => void) {
   listeners.add(listener);
