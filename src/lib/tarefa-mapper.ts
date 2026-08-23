@@ -1,4 +1,4 @@
-import type { ChecklistItem, Comentario, HistoricoEvento, Tarefa } from "@/lib/mock";
+import type { AnexoArquivo, ChecklistItem, Comentario, HistoricoEvento, Tarefa } from "@/lib/mock";
 
 /**
  * SELECT + mapeamento de uma linha do Supabase para a forma `Tarefa` usada em toda a UI
@@ -10,10 +10,11 @@ export const SELECT_TAREFA = `
   id, titulo, descricao, tipo_id, origem, solicitante_nome, solicitante_email, anexos, links,
   justificativa_prioridade, justificativa_prazo, observacoes, quantidade_unidade, dados_completos,
   tipo_solicitacao_geral, departamento, projeto_id, prioridade_sugerida, prioridade_final,
-  fase_atual_id, status, data_inicio, prazo, previsao_conclusao, executores_por_fase,
+  fase_atual_id, ordem_na_fase, status, data_inicio, prazo, previsao_conclusao, executores_por_fase,
   estimativa_por_fase, participantes_ids, tag_ids,
   checklist_itens(id, texto, feito, criado_em),
   comentarios(id, autor_id, texto, criado_em),
+  tarefa_anexos(id, nome_original, caminho_storage, criado_em),
   historico_eventos(id, data, autor_id, descricao, fase_id, acao),
   planejamentos(gerado_em, previsao_conclusao, status, folga_dias, etapa_atual_ordem,
     planejamento_etapas(id, etapa_id, ordem, colaborador_id, data_fim,
@@ -45,6 +46,7 @@ export function linhaParaTarefa(row: any): Tarefa {
     prioridadeSugerida: row.prioridade_sugerida ?? undefined,
     prioridadeFinal: row.prioridade_final,
     faseAtualId: row.fase_atual_id,
+    ordemNaFase: row.ordem_na_fase ?? undefined,
     statusAtividade: row.status,
     dataInicio: row.data_inicio,
     prazo: row.prazo ?? "",
@@ -66,6 +68,19 @@ export function linhaParaTarefa(row: any): Tarefa {
       .map(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (c: any): Comentario => ({ id: c.id, autorId: c.autor_id, texto: c.texto, data: c.criado_em })
+      ),
+    anexosArquivos: (row.tarefa_anexos ?? [])
+      .slice()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .sort((a: any, b: any) => a.criado_em.localeCompare(b.criado_em))
+      .map(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (a: any): AnexoArquivo => ({
+          id: a.id,
+          nomeOriginal: a.nome_original,
+          caminhoStorage: a.caminho_storage,
+          criadoEm: a.criado_em,
+        })
       ),
     historico: (row.historico_eventos ?? [])
       .slice()

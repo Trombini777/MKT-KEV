@@ -9,6 +9,7 @@ import {
   type EtapaAgendada,
   type EtapaAgendadaAplicada,
   type CategoriaEtapa,
+  type AnexoArquivo,
   type ChecklistItem,
   type Comentario,
   type HistoricoEvento,
@@ -866,8 +867,16 @@ export async function excluirTarefa(taskId: string): Promise<boolean> {
   return true;
 }
 
-/** Adiciona um comentário à tarefa — parte do "local de trabalho" da etapa em execução. */
-export async function adicionarComentario(taskId: string, texto: string) {
+/**
+ * Adiciona um comentário à tarefa — parte do "local de trabalho" da etapa em execução.
+ * `mencoes` (colaboradores citados via @nome no autocomplete) gera, além do vínculo em
+ * `comentario_mencoes`, uma notificação in-app pra cada mencionado — exceto o próprio autor.
+ */
+export async function adicionarComentario(
+  taskId: string,
+  texto: string,
+  mencoes: { colaboradorId: string }[] = []
+) {
   const limpo = texto.trim();
   if (!limpo) return;
   const supabase = createClient();
@@ -884,6 +893,28 @@ export async function adicionarComentario(taskId: string, texto: string) {
   const comentario: Comentario = { id: data.id, autorId: data.autor_id, texto: data.texto, data: data.criado_em };
   tasks = tasks.map((t) => (t.id === taskId ? { ...t, comentarios: [...t.comentarios, comentario] } : t));
   emit();
+
+  const idsUnicos = [...new Set(mencoes.map((m) => m.colaboradorId))];
+  if (idsUnicos.length === 0) return;
+
+  const { error: erroMencoes } = await supabase
+    .from("comentario_mencoes")
+    .insert(idsUnicos.map((colaboradorId) => ({ comentario_id: data.id, colaborador_id: colaboradorId })));
+  if (erroMencoes) console.error("Falha ao registrar menções:", erroMencoes.message);
+
+  const destinatarios = idsUnicos.filter((id) => id !== autor?.id);
+  if (destinatarios.length === 0) return;
+
+  const tituloTarefa = tasks.find((t) => t.id === taskId)?.titulo ?? "uma tarefa";
+  const { error: erroNotificacoes } = await supabase.from("notificacoes").insert(
+    destinatarios.map((colaboradorId) => ({
+      colaborador_id: colaboradorId,
+      tipo: "mencao_comentario",
+      tarefa_id: taskId,
+      mensagem: `${autor?.nome ?? "Alguém"} mencionou você num comentário em "${tituloTarefa}"`,
+    }))
+  );
+  if (erroNotificacoes) console.error("Falha ao notificar menções:", erroNotificacoes.message);
 }
 
 /** Marca/desmarca um item do checklist. */
@@ -924,7 +955,7 @@ export async function adicionarChecklistItem(taskId: string, texto: string) {
   emit();
 }
 
-/** Anexa um arquivo (só o nome, sem backend de upload ainda) à tarefa. */
+/** Anexa um arquivo (só o nome, sem backend de upload — legado, ver `enviarAnexo`) à tarefa. */
 export async function adicionarAnexo(taskId: string, nomeArquivo: string) {
   const limpo = nomeArquivo.trim();
   if (!limpo) return;
@@ -939,6 +970,86 @@ export async function adicionarAnexo(taskId: string, nomeArquivo: string) {
   }
   tasks = tasks.map((x) => (x.id === taskId ? { ...x, anexos: novosAnexos } : x));
   emit();
+}
+
+/**
+ * Envia um arquivo de verdade pro Storage (bucket `anexos`, privado — ver migration 0020) e
+ * registra em `tarefa_anexos`. Caminho leva um uuid próprio pra nunca colidir com outro arquivo
+ * de mesmo nome na mesma tarefa; o nome original fica só no metadado, pra exibição e download.
+ */
+export async function enviarAnexo(taskId: string, arquivo: File): Promise<boolean> {
+  const supabase = createClient();
+  const autor = await obterColaboradorAtual();
+  const caminho = `${taskId}/${crypto.randomUUID()}-${arquivo.name}`;
+  const { error: erroUpload } = await supabase.storage.from("anexos").upload(caminho, arquivo);
+  if (erroUpload) {
+    console.error("Falha ao enviar anexo:", erroUpload.message);
+    return false;
+  }
+  const { data, error } = await supabase
+    .from("tarefa_anexos")
+    .insert({
+      tarefa_id: taskId,
+      autor_id: autor?.id ?? null,
+      nome_original: arquivo.name,
+      caminho_storage: caminho,
+    })
+    .select("id, nome_original, caminho_storage, criado_em")
+    .single();
+  if (error || !data) {
+    console.error("Falha ao registrar anexo:", error?.message);
+    await supabase.storage.from("anexos").remove([caminho]);
+    return false;
+  }
+  const anexo: AnexoArquivo = {
+    id: data.id,
+    nomeOriginal: data.nome_original,
+    caminhoStorage: data.caminho_storage,
+    criadoEm: data.criado_em,
+  };
+  tasks = tasks.map((t) =>
+    t.id === taskId ? { ...t, anexosArquivos: [...(t.anexosArquivos ?? []), anexo] } : t
+  );
+  emit();
+  return true;
+}
+
+/**
+ * Reordena manualmente a fila de uma fase (Triagem em diante — ver kanban-board.tsx). Recebe a
+ * fase E a lista de ids na ordem final desejada, e grava um `ordem_na_fase` contíguo (0, 1, 2...)
+ * pra todo mundo de uma vez — inclusive quem ainda não tinha ordem explícita (por isso a fase
+ * inteira "materializa" na primeira reordenada, não só as duas tarefas que trocaram de lugar).
+ */
+export async function reordenarTarefasNaFase(faseId: string, idsEmOrdem: string[]) {
+  const supabase = createClient();
+  const resultados = await Promise.all(
+    idsEmOrdem.map((id, ordem) =>
+      supabase.from("tarefas").update({ ordem_na_fase: ordem }).eq("id", id)
+    )
+  );
+  const erro = resultados.find((r) => r.error)?.error;
+  if (erro) {
+    console.error("Falha ao reordenar fila da fase:", erro.message);
+    return;
+  }
+  const ordemPorId = new Map(idsEmOrdem.map((id, ordem) => [id, ordem]));
+  tasks = tasks.map((t) =>
+    t.faseAtualId === faseId && ordemPorId.has(t.id)
+      ? { ...t, ordemNaFase: ordemPorId.get(t.id) }
+      : t
+  );
+  emit();
+}
+
+/** URL assinada de curta duração pro anexo — bucket é privado, sem link público fixo. */
+export async function obterUrlAnexo(caminhoStorage: string): Promise<string | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase.storage.from("anexos").createSignedUrl(caminhoStorage, 60);
+  if (error || !data) {
+    console.error("Falha ao gerar link do anexo:", error?.message);
+    return null;
+  }
+  return data.signedUrl;
 }
 
 /** Adiciona um link de referência à tarefa. */

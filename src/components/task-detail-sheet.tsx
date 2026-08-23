@@ -12,6 +12,7 @@ import { StatusProjetoBadge } from "@/components/status-projeto-badge";
 import { StatusAtividadeEditor } from "@/components/status-atividade-editor";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Input } from "@/components/ui/input";
+import { MencaoComentarioInput, type MencaoPendente } from "@/components/mencao-comentario-input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
@@ -35,7 +36,8 @@ import {
   atualizarTitulo,
   vincularProjeto,
   adicionarComentario,
-  adicionarAnexo,
+  enviarAnexo,
+  obterUrlAnexo,
   adicionarLink,
   ajustarEtapaEmExecucao,
   atualizarPrazoTarefa,
@@ -221,7 +223,10 @@ export function TaskDetailSheet() {
   const [historicoColapsado, setHistoricoColapsado] = useState<Record<string, boolean>>({});
   const [atribuindoResponsavel, setAtribuindoResponsavel] = useState(false);
   const [novoComentario, setNovoComentario] = useState("");
+  const [mencoesPendentes, setMencoesPendentes] = useState<MencaoPendente[]>([]);
   const [novoLink, setNovoLink] = useState("");
+  const [enviandoAnexo, setEnviandoAnexo] = useState(false);
+  const [abrindoAnexoId, setAbrindoAnexoId] = useState<string | null>(null);
   const [editandoEtapaAtual, setEditandoEtapaAtual] = useState(false);
   const [dataEtapaInput, setDataEtapaInput] = useState("");
   const [horasEtapaInput, setHorasEtapaInput] = useState("");
@@ -905,18 +910,56 @@ export function TaskDetailSheet() {
               ) : tarefa.faseAtualId === "triagem" ? (
                 <>
                   <div>
-                    <ColunaLabel>Responsável pela atividade</ColunaLabel>
+                    <ColunaLabel>Responsável pela triagem</ColunaLabel>
                     {executoresFaseAtual.length > 0 ? (
                       <div className="mt-2 flex flex-col gap-2">
                         {executoresFaseAtual.map((cid) => (
-                          <div key={cid} className="flex items-center gap-2">
-                            <ColaboradorAvatar
-                              colaboradorId={cid}
-                              className="size-7"
-                              fallbackClassName="text-xs"
-                            />
-                            <span className="text-sm">{nomeColaborador(cid)}</span>
-                          </div>
+                          <Popover key={cid}>
+                            <PopoverTrigger
+                              render={
+                                <button
+                                  type="button"
+                                  className="flex items-center gap-2 rounded-md py-0.5 pr-2 text-left outline-none hover:bg-secondary/50"
+                                  aria-label="Trocar responsável pela triagem"
+                                  title="Trocar responsável"
+                                />
+                              }
+                            >
+                              <ColaboradorAvatar
+                                colaboradorId={cid}
+                                className="size-7"
+                                fallbackClassName="text-xs"
+                              />
+                              <span className="text-sm">{nomeColaborador(cid)}</span>
+                            </PopoverTrigger>
+                            <PopoverContent side="bottom" align="start" className="w-56 p-1.5">
+                              <p className="px-2 py-1 text-[0.65rem] font-semibold tracking-wider text-muted-foreground uppercase">
+                                Trocar responsável
+                              </p>
+                              <div className="flex max-h-64 flex-col gap-0.5 overflow-y-auto">
+                                {colaboradoresOperacionais.map((c) => (
+                                  <button
+                                    key={c.id}
+                                    type="button"
+                                    onClick={() =>
+                                      atribuirResponsavelEtapa(tarefa.id, tarefa.faseAtualId, c.id)
+                                    }
+                                    className={cn(
+                                      "flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted",
+                                      c.id === cid && "bg-muted"
+                                    )}
+                                  >
+                                    <ColaboradorAvatar
+                                      colaboradorId={c.id}
+                                      className="size-5 shrink-0"
+                                      fallbackClassName="text-[0.55rem]"
+                                    />
+                                    <span className="min-w-0 flex-1 truncate">{c.nome}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </PopoverContent>
+                          </Popover>
                         ))}
                       </div>
                     ) : atribuindoResponsavel ? (
@@ -1096,9 +1139,31 @@ export function TaskDetailSheet() {
               <div>
                 <ColunaLabel>Anexos e links</ColunaLabel>
                 <div className="mt-2 flex flex-col gap-1.5">
+                  {(tarefa.anexosArquivos ?? []).map((anexo) => (
+                    <button
+                      key={anexo.id}
+                      type="button"
+                      disabled={abrindoAnexoId === anexo.id}
+                      onClick={async () => {
+                        setAbrindoAnexoId(anexo.id);
+                        const url = await obterUrlAnexo(anexo.caminhoStorage);
+                        setAbrindoAnexoId(null);
+                        if (url) window.open(url, "_blank", "noopener,noreferrer");
+                      }}
+                      className="flex items-center gap-2 text-left text-sm text-primary hover:underline disabled:cursor-wait disabled:no-underline disabled:opacity-60"
+                    >
+                      <Paperclip className="size-3.5 shrink-0" />
+                      <span className="truncate">{anexo.nomeOriginal}</span>
+                    </button>
+                  ))}
+                  {/* Legado: só o nome foi salvo, sem upload — não tem arquivo real pra abrir. */}
                   {(tarefa.anexos ?? []).map((nome, i) => (
-                    <div key={`anexo-${i}`} className="flex items-center gap-2 text-sm">
-                      <Paperclip className="size-3.5 shrink-0 text-muted-foreground" />
+                    <div
+                      key={`anexo-${i}`}
+                      className="flex items-center gap-2 text-sm text-muted-foreground"
+                      title="Anexo antigo, enviado antes do upload existir — sem arquivo pra abrir."
+                    >
+                      <Paperclip className="size-3.5 shrink-0" />
                       <span className="truncate">{nome}</span>
                     </div>
                   ))}
@@ -1114,9 +1179,11 @@ export function TaskDetailSheet() {
                       <span className="truncate">{url}</span>
                     </a>
                   ))}
-                  {(tarefa.anexos ?? []).length === 0 && (tarefa.links ?? []).length === 0 && (
-                    <p className="text-xs text-muted-foreground">Nenhum anexo ou link ainda.</p>
-                  )}
+                  {(tarefa.anexosArquivos ?? []).length === 0 &&
+                    (tarefa.anexos ?? []).length === 0 &&
+                    (tarefa.links ?? []).length === 0 && (
+                      <p className="text-xs text-muted-foreground">Nenhum anexo ou link ainda.</p>
+                    )}
                 </div>
                 <div className="mt-2 flex flex-col gap-1.5">
                   <form
@@ -1142,16 +1209,25 @@ export function TaskDetailSheet() {
                       <Plus className="size-4" />
                     </button>
                   </form>
-                  <label className="flex w-fit cursor-pointer items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground">
+                  <label
+                    className={cn(
+                      "flex w-fit cursor-pointer items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground",
+                      enviandoAnexo && "pointer-events-none opacity-60"
+                    )}
+                  >
                     <Paperclip className="size-3.5" />
-                    Anexar arquivo
+                    {enviandoAnexo ? "Enviando..." : "Anexar arquivo"}
                     <input
                       type="file"
                       className="hidden"
-                      onChange={(e) => {
+                      disabled={enviandoAnexo}
+                      onChange={async (e) => {
                         const arquivo = e.target.files?.[0];
-                        if (arquivo) adicionarAnexo(tarefa.id, arquivo.name);
                         e.target.value = "";
+                        if (!arquivo) return;
+                        setEnviandoAnexo(true);
+                        await enviarAnexo(tarefa.id, arquivo);
+                        setEnviandoAnexo(false);
                       }}
                     />
                   </label>
@@ -1182,15 +1258,17 @@ export function TaskDetailSheet() {
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
-                    adicionarComentario(tarefa.id, novoComentario);
+                    adicionarComentario(tarefa.id, novoComentario, mencoesPendentes);
                     setNovoComentario("");
+                    setMencoesPendentes([]);
                   }}
                   className="mt-2 flex items-center gap-1.5"
                 >
-                  <Input
+                  <MencaoComentarioInput
                     value={novoComentario}
-                    onChange={(e) => setNovoComentario(e.target.value)}
-                    placeholder="Adicionar comentário"
+                    onChange={setNovoComentario}
+                    onMencionar={(m) => setMencoesPendentes((atual) => [...atual, m])}
+                    placeholder="Adicionar comentário (@ pra mencionar alguém)"
                     className="h-8 text-sm"
                   />
                   <button

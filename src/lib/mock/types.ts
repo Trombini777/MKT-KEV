@@ -112,6 +112,24 @@ export type Comentario = {
   data: string;
 };
 
+/** Arquivo de verdade enviado ao Storage (`tarefa_anexos`) — diferente de `Tarefa.anexos`, que
+ * hoje só guarda o nome digitado/legado, sem upload nenhum por trás. */
+export type AnexoArquivo = {
+  id: string;
+  nomeOriginal: string;
+  caminhoStorage: string;
+  criadoEm: string;
+};
+
+export type Notificacao = {
+  id: string;
+  tipo: string;
+  tarefaId?: string;
+  mensagem: string;
+  lida: boolean;
+  criadoEm: string;
+};
+
 export type HistoricoEvento = {
   id: string;
   data: string;
@@ -199,8 +217,11 @@ export type Tarefa = {
   solicitanteNome?: string;
   /** E-mail de quem pediu a tarefa — preenchido quando origem é "Solicitação". */
   solicitanteEmail?: string;
-  /** Nomes dos arquivos anexados — preenchido na solicitação e/ou durante a execução. */
+  /** Nomes dos arquivos anexados — preenchido na solicitação e/ou durante a execução. Legado:
+   * sem upload real, ver `anexosArquivos` pros arquivos enviados de fato ao Storage. */
   anexos?: string[];
+  /** Arquivos enviados de verdade (Supabase Storage) — clicáveis/baixáveis, diferente de `anexos`. */
+  anexosArquivos?: AnexoArquivo[];
   /** Links úteis pra execução da atividade (referência, arquivo em nuvem etc.), adicionados livremente. */
   links?: string[];
   /** Por que a solicitação é Alta prioridade — preenchido só quando prioridadeSugerida é "Alta". */
@@ -220,6 +241,9 @@ export type Tarefa = {
   prioridadeSugerida?: PrioridadeSugerida;
   prioridadeFinal: PrioridadeFinal;
   faseAtualId: string;
+  /** Posição manual dentro da fila da fase atual (Triagem em diante) — `undefined` até alguém
+   * reordenar a fase pela primeira vez arrastando um card; até lá, ordena pela ordem de chegada. */
+  ordemNaFase?: number;
   statusAtividade: StatusAtividade;
   etapaAtualId?: string;
   execucaoEtapaAte?: string;
