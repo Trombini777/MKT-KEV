@@ -10,6 +10,7 @@ import { TABS_ATIVO_PRIMARY_CLASS } from "@/lib/utils";
 export function WorkloadView({
   title,
   pessoaId,
+  colaboradoresIds,
   diaSelecionado,
   onSelecionarDia,
   mostrarAtividades = false,
@@ -17,6 +18,9 @@ export function WorkloadView({
 }: {
   title?: string;
   pessoaId?: string;
+  /** Restringe as linhas da grade a esses ids (ex.: filtro de Executor em Gestão de Tarefas) —
+   * sem isso, mostra todo o time operacional. Ignorado quando `pessoaId` também é passado. */
+  colaboradoresIds?: string[];
   diaSelecionado?: string | null;
   onSelecionarDia?: (iso: string) => void;
   /** Detalha embaixo da hora as atividades que a compõem — só na grade completa de Gestão de
@@ -59,6 +63,7 @@ export function WorkloadView({
       <PersonDayGrid
         dias={dias}
         colaboradorId={pessoaId}
+        colaboradoresIds={colaboradoresIds}
         tarefas={tarefas}
         diaSelecionado={diaSelecionado}
         onSelecionarDia={onSelecionarDia}

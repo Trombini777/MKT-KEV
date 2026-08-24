@@ -24,6 +24,7 @@ export function PersonDayGrid({
   dias,
   overrides = {},
   colaboradorId,
+  colaboradoresIds,
   tarefas,
   diaSelecionado,
   onSelecionarDia,
@@ -32,6 +33,9 @@ export function PersonDayGrid({
   dias: DiaGrade[];
   overrides?: Record<string, string>;
   colaboradorId?: string;
+  /** Restringe as linhas da grade a esses ids (ex.: filtro de Executor em Gestão de Tarefas) —
+   * sem isso, mostra todo o time operacional. Ignorado quando `colaboradorId` também é passado. */
+  colaboradoresIds?: string[];
   /** Tarefas ao vivo (via useTasks()) — sem isso, cai no array estático do seed. */
   tarefas?: Tarefa[];
   /** Dia (iso) atualmente filtrado — realça a coluna inteira. */
@@ -51,7 +55,9 @@ export function PersonDayGrid({
   const colaboradoresAtivos = COLABORADORES.filter(
     (c) =>
       c.status !== "Inativo" &&
-      (colaboradorId ? c.id === colaboradorId : colaboradorEhOperacional(c))
+      (colaboradorId
+        ? c.id === colaboradorId
+        : colaboradorEhOperacional(c) && (!colaboradoresIds || colaboradoresIds.includes(c.id)))
   );
   const interativo = onSelecionarDia != null;
 
