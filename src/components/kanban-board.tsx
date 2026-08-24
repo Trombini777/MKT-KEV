@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { isoHoje, diasEntre } from "@/lib/hoje";
 import { decimalParaHorario } from "@/lib/time-format";
 import { useProjetos } from "@/lib/projeto-store";
+import { reordenarTarefasNaFase } from "@/lib/task-store";
 import { useConfiguracoesFluxo } from "@/lib/configuracoes-fluxo-store";
 import {
   FASES,
@@ -135,12 +136,33 @@ export function KanbanBoard({
     >
       <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4">
       {fasesOrdenadas.map((fase) => {
-        const tarefasDaFase = tasks.filter((t) => t.faseAtualId === fase.id);
-        const podeReceber = draggingId
-          ? destinosPermitidos(
-              tasks.find((t) => t.id === draggingId)?.faseAtualId ?? ""
-            ).includes(fase.id)
+        // Solicitações é intake não-priorizado (fila chega e sai pra Triagem); da Triagem em
+        // diante, cada fase tem fila manual — ver reordenarTarefasNaFase (task-store.ts).
+        const permiteReordenar = fase.id !== "solicitacoes";
+        const tarefasDaFase = tasks
+          .filter((t) => t.faseAtualId === fase.id)
+          .sort((a, b) =>
+            permiteReordenar ? (a.ordemNaFase ?? Infinity) - (b.ordemNaFase ?? Infinity) : 0
+          );
+        const tarefaArrastada = draggingId ? tasks.find((t) => t.id === draggingId) : undefined;
+        const reordenandoNestaFase =
+          permiteReordenar && tarefaArrastada?.faseAtualId === fase.id;
+        const podeReceber = tarefaArrastada
+          ? destinosPermitidos(tarefaArrastada.faseAtualId).includes(fase.id) || reordenandoNestaFase
           : false;
+
+        function reordenarNaSolta(idAlvo: string) {
+          if (!draggingId || draggingId === idAlvo) return;
+          const idsAtuais = tarefasDaFase.map((t) => t.id);
+          const semArrastada = idsAtuais.filter((id) => id !== draggingId);
+          const indiceAlvo = semArrastada.indexOf(idAlvo);
+          const novaOrdem = [
+            ...semArrastada.slice(0, indiceAlvo),
+            draggingId,
+            ...semArrastada.slice(indiceAlvo),
+          ];
+          reordenarTarefasNaFase(fase.id, novaOrdem);
+        }
 
         return (
           <div
@@ -148,7 +170,20 @@ export function KanbanBoard({
             onDragOver={(e) => {
               if (podeReceber) e.preventDefault();
             }}
-            onDrop={() => handleDrop(fase.id)}
+            onDrop={() => {
+              // Soltar no vazio da própria fase (não em cima de um card) manda pro fim da fila;
+              // fora dela continua sendo troca de fase normal (handleDrop já valida a transição).
+              if (reordenandoNestaFase && draggingId) {
+                const idsAtuais = tarefasDaFase.map((t) => t.id);
+                reordenarTarefasNaFase(
+                  fase.id,
+                  [...idsAtuais.filter((id) => id !== draggingId), draggingId]
+                );
+                setDraggingId(null);
+              } else {
+                handleDrop(fase.id);
+              }
+            }}
             style={{ width: larguraColuna }}
             className={cn(
               "flex shrink-0 snap-start flex-col gap-2 overflow-hidden rounded-xl p-2.5 pt-0 transition-colors",
@@ -165,7 +200,7 @@ export function KanbanBoard({
             </div>
 
             <div className="flex flex-col gap-2">
-              {tarefasDaFase.map((tarefa) => {
+              {tarefasDaFase.map((tarefa, indice) => {
                 const etapaAtual = infoEtapaAtual(tarefa);
                 const executorId = etapaAtual.executorId;
                 const emRisco = estaEmRisco(tarefa);
@@ -200,6 +235,16 @@ export function KanbanBoard({
                     draggable
                     onDragStart={() => setDraggingId(tarefa.id)}
                     onDragEnd={() => setDraggingId(null)}
+                    onDragOver={(e) => {
+                      if (podeReceber) e.preventDefault();
+                      if (reordenandoNestaFase) e.stopPropagation();
+                    }}
+                    onDrop={(e) => {
+                      if (!reordenandoNestaFase) return;
+                      e.stopPropagation();
+                      reordenarNaSolta(tarefa.id);
+                      setDraggingId(null);
+                    }}
                     onClick={() => abrirTarefa(tarefa.id)}
                     className={cn(
                       "cursor-pointer overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm transition-all hover:ring-1 hover:ring-primary/50 active:cursor-grabbing dark:hover:ring-primary/50",
@@ -207,9 +252,19 @@ export function KanbanBoard({
                     )}
                   >
                     <div className="flex items-center justify-between gap-2 bg-muted px-4 py-2 dark:bg-white/5">
-                      <span className="text-[0.65rem] font-semibold tracking-wide text-muted-foreground uppercase">
-                        {nomeTipo(tarefa.tipoId)}
-                      </span>
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        {permiteReordenar && (
+                          <span
+                            title="Posição na fila desta fase"
+                            className="flex size-4 shrink-0 items-center justify-center rounded-full bg-primary text-[0.6rem] font-bold text-primary-foreground"
+                          >
+                            {indice + 1}
+                          </span>
+                        )}
+                        <span className="truncate text-[0.65rem] font-semibold tracking-wide text-muted-foreground uppercase">
+                          {nomeTipo(tarefa.tipoId)}
+                        </span>
+                      </div>
                       {unidadeMedida && tarefa.quantidadeUnidade != null && (
                         <span
                           title={`${tarefa.quantidadeUnidade} ${unidadeMedida.nome}${tarefa.quantidadeUnidade === 1 ? "" : "s"}`}

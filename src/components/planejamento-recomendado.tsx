@@ -174,6 +174,7 @@ export function PlanejamentoRecomendado({
   const [editandoDataDesejada, setEditandoDataDesejada] = useState(false);
   const [dataDesejadaInput, setDataDesejadaInput] = useState("");
   const [expandido, setExpandido] = useState(false);
+  const [planejando, setPlanejando] = useState(false);
   const [salvandoReplanejamento, setSalvandoReplanejamento] = useState(false);
   const [erroReplanejamento, setErroReplanejamento] = useState(false);
 
@@ -588,6 +589,28 @@ export function PlanejamentoRecomendado({
   // enquadramento de "tela cheia" — aqui basta o conteúdo, sem a caixa/label/botão de expandir
   // da versão usada na Triagem.
   if (modoReplanejamento) return conteudo;
+
+  if (!planejando) {
+    return (
+      <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 p-3">
+        <div>
+          <Rotulo>Planejamento da atividade</Rotulo>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {esforcoPrevisto > 0
+              ? `~${decimalParaHorario(esforcoPrevisto)} de esforço previsto`
+              : "Configure as etapas pra ver o esforço e o prazo previstos."}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setPlanejando(true)}
+          className="shrink-0 rounded-full bg-primary px-3.5 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+        >
+          Planejar atividade
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-border/60 p-3">

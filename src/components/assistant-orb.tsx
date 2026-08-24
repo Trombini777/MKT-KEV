@@ -121,7 +121,7 @@ export function AssistantOrb() {
   const { messages, sendMessage, status, error, setMessages } = useChat();
   const digitando = status === "submitted" || status === "streaming" || limpando;
 
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const fimRef = useRef<HTMLDivElement>(null);
 
   // Tarefa aberta agora no detalhe (?tarefa=<id>, mesma fonte que task-detail-sheet.tsx usa) —
@@ -404,6 +404,7 @@ export function AssistantOrb() {
       const conteudo = (mensagem ?? texto).trim();
       if (!conteudo || digitando) return;
       setTexto("");
+      if (inputRef.current) inputRef.current.style.height = "auto";
 
       if (conteudo.toLowerCase() === COMANDO_APAGAR_HISTORICO) {
         apagarHistoricoCompleto();
@@ -593,14 +594,26 @@ export function AssistantOrb() {
                 e.preventDefault();
                 enviar();
               }}
-              className="flex items-center gap-2 rounded-full border border-border bg-background px-2 py-1 focus-within:ring-1 focus-within:ring-primary/40"
+              className="flex items-end gap-2 rounded-2xl border border-border bg-background px-2 py-1 focus-within:ring-1 focus-within:ring-primary/40"
             >
-              <input
+              <textarea
                 ref={inputRef}
                 value={texto}
-                onChange={(e) => setTexto(e.target.value)}
+                onChange={(e) => {
+                  setTexto(e.target.value);
+                  const el = e.target;
+                  el.style.height = "auto";
+                  el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    enviar();
+                  }
+                }}
                 placeholder="Escreva sua mensagem…"
-                className="min-w-0 flex-1 bg-transparent px-2 py-1.5 text-sm outline-none placeholder:text-muted-foreground"
+                rows={1}
+                className="min-w-0 flex-1 resize-none bg-transparent px-2 py-1.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground"
               />
               <button
                 type="submit"
