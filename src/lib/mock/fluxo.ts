@@ -25,6 +25,15 @@ export function destinosPermitidos(faseId: string): string[] {
   return TRANSICOES.filter((t) => t.de === faseId).map((t) => t.para);
 }
 
+/** Da Triagem em diante, o card só avança depois de "Planejar atividade" — é o planejamento
+ * (aplicarPlanejamento) que tira o card da Triagem; mover na mão sem ele deixava a atividade
+ * em Backlog/Execução sem etapas e sem como planejar mais. */
+export const FASES_QUE_EXIGEM_PLANEJAMENTO = ["backlog", "em-execucao", "aprovacao", "concluido"];
+
+export function exigePlanejamento(faseId: string): boolean {
+  return FASES_QUE_EXIGEM_PLANEJAMENTO.includes(faseId);
+}
+
 export function faseById(id: string): Fase | undefined {
   return FASES.find((f) => f.id === id);
 }

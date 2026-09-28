@@ -13,6 +13,7 @@ import { useConfiguracoesFluxo } from "@/lib/configuracoes-fluxo-store";
 import {
   FASES,
   destinosPermitidos,
+  exigePlanejamento,
   infoEtapaAtual,
   projetoById,
   tipoById,
@@ -23,6 +24,15 @@ import {
   estaEmRisco,
   type Tarefa,
 } from "@/lib/mock";
+
+// Sem planejamento, arrastar pra Backlog em diante fica bloqueado — o caminho é "Planejar
+// atividade" na Triagem (ver exigePlanejamento).
+function podeSoltarEm(tarefa: Tarefa, faseId: string): boolean {
+  return (
+    destinosPermitidos(tarefa.faseAtualId).includes(faseId) &&
+    (!exigePlanejamento(faseId) || tarefa.planejamento != null)
+  );
+}
 
 function formatarDataCurta(iso?: string): string {
   if (!iso) return "—";
@@ -120,7 +130,7 @@ export function KanbanBoard({
   function handleDrop(faseId: string) {
     if (!draggingId) return;
     const tarefa = tasks.find((t) => t.id === draggingId);
-    if (tarefa && destinosPermitidos(tarefa.faseAtualId).includes(faseId)) {
+    if (tarefa && podeSoltarEm(tarefa, faseId)) {
       onMoverTarefa(draggingId, faseId);
     }
     setDraggingId(null);
@@ -148,7 +158,7 @@ export function KanbanBoard({
         const reordenandoNestaFase =
           permiteReordenar && tarefaArrastada?.faseAtualId === fase.id;
         const podeReceber = tarefaArrastada
-          ? destinosPermitidos(tarefaArrastada.faseAtualId).includes(fase.id) || reordenandoNestaFase
+          ? podeSoltarEm(tarefaArrastada, fase.id) || reordenandoNestaFase
           : false;
 
         function reordenarNaSolta(idAlvo: string) {

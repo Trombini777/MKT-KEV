@@ -3,6 +3,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import {
   faseById,
+  exigePlanejamento,
   etapaById,
   type Tarefa,
   type PlanejamentoTarefa,
@@ -385,9 +386,9 @@ export async function aplicarPlanejamento(
     etapas: EtapaAgendada[];
   },
   dataInicio?: string
-) {
+): Promise<boolean> {
   const t = tasks.find((x) => x.id === taskId);
-  if (!t) return;
+  if (!t) return false;
   const supabase = createClient();
 
   const { data: planRow, error: planErro } = await supabase
@@ -403,7 +404,7 @@ export async function aplicarPlanejamento(
     .single();
   if (planErro || !planRow) {
     console.error("Falha ao aplicar planejamento:", planErro?.message);
-    return;
+    return false;
   }
 
   const etapasAplicadas: EtapaAgendadaAplicada[] = [];
@@ -468,6 +469,7 @@ export async function aplicarPlanejamento(
       : x
   );
   emit();
+  return true;
 }
 
 /**
@@ -814,6 +816,11 @@ export async function deslocarOcupacaoParaAjuste(
 export async function moveTask(taskId: string, novaFaseId: string) {
   const atual = tasks.find((x) => x.id === taskId);
   if (!atual) return;
+  // Última barreira (UI já esconde/desabilita): sem planejamento o card não passa da Triagem.
+  if (exigePlanejamento(novaFaseId) && !atual.planejamento) {
+    console.error("Atividade sem planejamento não pode ir para", novaFaseId);
+    return;
+  }
   const supabase = createClient();
   const { error } = await supabase
     .from("tarefas")

@@ -236,27 +236,40 @@ export function PlanejamentoRecomendado({
     }
   }
 
-  function criar() {
+  async function criar() {
     if (!todasComExecutor) return;
     const dataInicioAtividade = linhas[0]?.inicioEm ?? dataInicio;
-    aplicarPlanejamento(
-      tarefa.id,
-      {
-        etapas: linhas.map((l) => ({
-          etapaId: l.etapaId,
-          ordem: l.ordem,
-          colaboradorId: l.colaboradorId,
-          alocacoes: distribuirHorasPorDia(l.inicioEm, l.concluirEm, l.horas),
-          dataFim: l.concluirEm,
-        })),
-        previsaoConclusao,
-        ...classificarStatus(previsaoConclusao, tarefa.prazo || undefined),
-      },
-      dataInicioAtividade
-    );
-    // Se a atividade só começa depois de hoje, fica no Backlog aguardando a data — assim que o
-    // dia de início chegar, `sincronizarInicioDeTarefas` (task-store) move sozinha pra Execução.
-    moveTask(tarefa.id, dataInicioAtividade <= isoHoje() ? "em-execucao" : "backlog");
+    // Aguarda o planejamento existir no store antes de mover — moveTask recusa Backlog/Execução
+    // pra tarefa sem planejamento (ver exigePlanejamento). O mesmo flag do replanejamento trava o
+    // botão enquanto salva, pra não gerar um segundo planejamento num duplo clique.
+    setSalvandoReplanejamento(true);
+    setErroReplanejamento(false);
+    try {
+      const ok = await aplicarPlanejamento(
+        tarefa.id,
+        {
+          etapas: linhas.map((l) => ({
+            etapaId: l.etapaId,
+            ordem: l.ordem,
+            colaboradorId: l.colaboradorId,
+            alocacoes: distribuirHorasPorDia(l.inicioEm, l.concluirEm, l.horas),
+            dataFim: l.concluirEm,
+          })),
+          previsaoConclusao,
+          ...classificarStatus(previsaoConclusao, tarefa.prazo || undefined),
+        },
+        dataInicioAtividade
+      );
+      if (!ok) {
+        setErroReplanejamento(true);
+        return;
+      }
+      // Se a atividade só começa depois de hoje, fica no Backlog aguardando a data — assim que o
+      // dia de início chegar, `sincronizarInicioDeTarefas` (task-store) move sozinha pra Execução.
+      await moveTask(tarefa.id, dataInicioAtividade <= isoHoje() ? "em-execucao" : "backlog");
+    } finally {
+      setSalvandoReplanejamento(false);
+    }
   }
 
   if (tarefa.planejamento && !modoReplanejamento) {
@@ -567,7 +580,8 @@ export function PlanejamentoRecomendado({
       )}
       {erroReplanejamento && (
         <p className="text-xs text-destructive">
-          Não deu pra salvar o replanejamento agora — tenta de novo em instantes.
+          Não deu pra salvar o {modoReplanejamento ? "replanejamento" : "planejamento"} agora — tenta
+          de novo em instantes.
         </p>
       )}
       <button

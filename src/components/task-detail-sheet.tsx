@@ -61,6 +61,7 @@ import {
   PROJETOS,
   estaEmRisco,
   destinosPermitidos,
+  exigePlanejamento,
   TIPOS_TAREFA,
   COLABORADORES,
   colaboradorEhOperacional,
@@ -1349,8 +1350,13 @@ export function TaskDetailSheet() {
                           // — destaca ele em verde e bloqueia ir direto pro Backlog nesse caso.
                           const faltamDados = tarefa.dadosCompletos === "nao";
                           const emDestaque = faltamDados && destinoId === "aguardando-info";
+                          // Este bloco só aparece sem planejamento aplicado — daí em diante (Backlog,
+                          // Execução...) só via "Planejar atividade" (ver exigePlanejamento).
+                          const semPlanejamento = exigePlanejamento(destinoId);
                           const bloqueado =
-                            faltamRequisitosTriagem || (faltamDados && destinoId === "backlog");
+                            faltamRequisitosTriagem ||
+                            semPlanejamento ||
+                            (faltamDados && destinoId === "backlog");
                           return (
                             <button
                               key={destinoId}
@@ -1360,7 +1366,9 @@ export function TaskDetailSheet() {
                               title={
                                 faltamRequisitosTriagem
                                   ? "Responda as perguntas obrigatórias (*) antes de mover."
-                                  : bloqueado
+                                  : semPlanejamento
+                                    ? 'Planeje a atividade ("Planejar atividade") antes de mover.'
+                                    : bloqueado
                                     ? 'Faltam dados — mova para "Aguardando Informações" primeiro.'
                                     : undefined
                               }
@@ -1379,10 +1387,17 @@ export function TaskDetailSheet() {
                           );
                         })}
                       </div>
-                      {faltamRequisitosTriagem && (
+                      {faltamRequisitosTriagem ? (
                         <p className="text-xs text-muted-foreground">
                           Responda as perguntas obrigatórias (*) pra liberar o avanço.
                         </p>
+                      ) : (
+                        destinos.some(exigePlanejamento) && (
+                          <p className="text-xs text-muted-foreground">
+                            Planeje a atividade (&quot;Planejar atividade&quot;) pra liberar o avanço — ao
+                            criar a atividade o card segue sozinho.
+                          </p>
+                        )
                       )}
                     </>
                   )}
