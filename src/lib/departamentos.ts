@@ -1,27 +1,34 @@
-/**
- * Lista fechada de Departamento/Área solicitante (PRD.md E1): subconjunto
- * documentado (~18 de ~29 itens reais do Pipefy). Completar com a lista
- * original antes de conectar o backend real (docs/PLAN.md, M2).
- */
+/** Lista fechada de Departamento/Área solicitante (PRD.md E1), completa (29 itens do Pipefy). */
 export const DEPARTAMENTOS = [
   "Agronegócio",
   "Assistência Financeira",
   "Autoday",
   "Bancassurance",
+  "Capitalização",
   "Comercial",
   "Conecta",
+  "Controles Internos",
   "Diretoria Executiva",
   "Estrutural",
+  "Facilities",
   "Financeiro",
+  "Financial Lines",
+  "Garantia",
   "Jurídico",
   "KEV",
   "Marketing",
   "Operações",
+  "Produtos",
   "Projetos",
-  "RH",
+  "Quality Assurance",
+  "RCO",
+  "Recursos Humanos",
+  "Resseguros",
   "Side",
   "Sinistros",
   "Tecnologia",
+  "Transportes",
+  "Viagem",
 ] as const;
 
 export type Departamento = (typeof DEPARTAMENTOS)[number];
