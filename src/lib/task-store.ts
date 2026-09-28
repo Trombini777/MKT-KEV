@@ -1138,6 +1138,11 @@ export async function ajustarEtapaEmExecucao(
       await supabase.from("planejamento_etapas").update({ data_fim: etapa.dataFim }).eq("id", etapaRow.id);
       await substituirAlocacoesDaEtapa(supabase, etapaRow.id, etapa.alocacoes);
     }
+    // `planejamentos.previsao_conclusao` precisa acompanhar — sem isso, um recarregamento
+    // (fora da sessão que fez o ajuste) volta a mostrar a previsão antiga aqui, só que
+    // "Atividade atrasada"/"em dia" já usa `tarefas.previsao_conclusao` (linha abaixo), que
+    // fica certo — os dois badges destoam.
+    await supabase.from("planejamentos").update({ previsao_conclusao: previsaoConclusao }).eq("id", planRow.id);
   }
   await supabase.from("tarefas").update({ previsao_conclusao: previsaoConclusao }).eq("id", taskId);
 
@@ -1255,11 +1260,14 @@ export async function replanejarEtapasDaAtividade(
     .update({ previsao_conclusao: previsaoConclusao, executores_por_fase: novoExecutoresPorFase })
     .eq("id", taskId);
   if (erroTarefa) console.error("Falha ao atualizar previsão/executores após replanejar:", erroTarefa.message);
-  // status/folgaDias (badge "dentro do prazo"/"apertado"/"impossível") também ficariam presos ao
-  // valor de quando o plano foi aplicado pela primeira vez se não forem recalculados aqui.
+  // status/folgaDias (badge "dentro do prazo"/"apertado"/"impossível") e previsao_conclusao
+  // também ficariam presos ao valor de quando o plano foi aplicado pela primeira vez se não
+  // forem recalculados aqui — `tarefas.previsao_conclusao` (acima) já fica certo, mas
+  // `planejamentos.previsao_conclusao` (usado pra exibir "Projeção de entrega") sem isso destoa
+  // depois de qualquer replanejamento.
   const { error: erroStatus } = await supabase
     .from("planejamentos")
-    .update({ status: status.status, folga_dias: status.folgaDias ?? null })
+    .update({ status: status.status, folga_dias: status.folgaDias ?? null, previsao_conclusao: previsaoConclusao })
     .eq("id", planRow.id);
   if (erroStatus) console.error("Falha ao atualizar status do planejamento:", erroStatus.message);
   const sucesso = sucessoTotal && !erroTarefa && !erroStatus;
