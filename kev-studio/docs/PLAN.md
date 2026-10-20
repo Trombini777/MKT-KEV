@@ -80,7 +80,7 @@ Supabase existente e com deploy de preview na Vercel.
 - [x] Página inicial de status (identidade, conexão com o Supabase) validada no navegador
 - [ ] Projeto Vercel do Studio (Root Directory `kev-studio`, Ignored Build Step) e deploy de
       preview funcionando
-- [ ] Commit do M0 (só com pedido explícito)
+- [x] Commit do M0 (`7d1212c` código, `7bd6b70` docs)
 **Commit final:** `chore: setup inicial do KEV Studio no repositório`
 
 ---
