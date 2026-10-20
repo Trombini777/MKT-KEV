@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // KEV Studio é um app separado na mesma repo, com lint próprio.
+    "kev-studio/**",
   ]),
 ]);
 

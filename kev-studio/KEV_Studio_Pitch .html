@@ -1,0 +1,913 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+</head>
+<body>
+<title>KEV Studio Pitch</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: deck de slides 16:9 empilhados (scroll snap), alternando capa verde, slides pretos de impacto e slides brancos de leitura. Marca única KEV, sem tema escuro alternativo. */
+:root {
+  --lime: #CEFF00;
+  --lime-soft: #F3FFC2;
+  --lime-line: #E4F79A;
+  --ink: #0E0F0B;
+  --ink-2: #1C1E17;
+  --gray: #5B5E52;
+  --paper: #FFFFFF;
+  --on-dark: #F7F8F2;
+  --font: "Manrope", "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; overflow: hidden; background: var(--ink); color: var(--ink); font-family: var(--font); -webkit-font-smoothing: antialiased; }
+.deck { position: fixed; inset: 0; overflow: hidden; }
+
+.slide { position: absolute; left: 50%; top: 50%; width: 1280px; height: 720px; transform: translate(-50%, -50%) scale(var(--s, 1)); transform-origin: center; container-type: inline-size; overflow: hidden; display: flex; flex-direction: column; padding: 54px 64px; background: var(--paper); color: var(--ink); }
+.slide:not(.on) { visibility: hidden; }
+.slide.on { animation: fade .35s ease both; }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .slide.on { animation: none; } }
+.slide.dark { background: var(--ink); color: var(--on-dark); }
+.slide.lime { background: var(--lime); color: var(--ink); }
+
+.logo { display: block; fill: currentColor; height: auto; }
+.top { display: flex; align-items: center; gap: 16px; flex: none; }
+.top .tag { font-size: 11px; letter-spacing: .28em; text-transform: uppercase; font-weight: 600; white-space: nowrap; }
+.top i { flex: 1; height: 1px; background: currentColor; opacity: .25; }
+.dark .top i { background: var(--lime); opacity: .6; }
+.top .logo { width: 58px; }
+.pg { font-family: var(--mono); font-size: 11px; opacity: .6; font-variant-numeric: tabular-nums; }
+
+.body { flex: 1; display: flex; flex-direction: column; justify-content: center; min-height: 0; gap: clamp(14px, 2.4cqw, 28px); }
+h1, h2, h3, p { margin: 0; }
+h2 { font-weight: 500; font-size: clamp(26px, 3.6cqw, 48px); line-height: 1.08; letter-spacing: -.02em; text-wrap: balance; max-width: 22ch; }
+.dark h2 { color: var(--on-dark); }
+.br { color: var(--lime); font-family: var(--mono); font-weight: 400; }
+.lime .br, .slide:not(.dark):not(.lime) .br { color: var(--ink); background: var(--lime); padding: 0 .12em; border-radius: 3px; }
+.lead { font-size: clamp(14px, 1.45cqw, 19px); line-height: 1.55; font-weight: 400; max-width: 60ch; color: inherit; opacity: .85; }
+.small { font-size: clamp(11px, 1.05cqw, 13px); line-height: 1.5; color: var(--gray); }
+.dark .small { color: #B9BCAE; }
+.mono { font-family: var(--mono); }
+
+/* Capa */
+.cover .body { align-items: center; justify-content: center; }
+.cover .lockup { width: min(520px, 62%); display: flex; flex-direction: column; gap: 1.6cqw; container-type: inline-size; }
+.cover .logo.big { width: 100%; }
+/* Marketing ocupa da haste do K (437.28) ao fim da base do V (991.49), numa logo de 1061.51 de largura */
+.cover .sign { margin-left: 41.19%; width: 52.21%; display: flex; justify-content: space-between; font-size: 4.6cqw; font-weight: 600; line-height: 1; }
+.cover .meta { display: flex; justify-content: center; gap: 12px 40px; flex-wrap: wrap; flex: none; font-family: var(--mono); font-size: clamp(10px, 1.1cqw, 13px); opacity: .75; text-align: center; }
+.subcover .body { justify-content: center; }
+.subcover h1 { font-size: clamp(32px, 5.4cqw, 72px); font-weight: 600; line-height: 1.04; letter-spacing: -.035em; max-width: 18ch; text-wrap: balance; color: var(--ink); }
+.subcover .chipword { display: inline-block; background: var(--ink); color: var(--paper); font-family: var(--mono); font-weight: 400; letter-spacing: -.02em; padding: .02em .22em .08em; border-radius: .14em; line-height: 1; vertical-align: .04em; }
+.subcover .chipword i { font-style: normal; color: var(--lime); }
+.subcover .ghost { color: var(--paper); -webkit-text-stroke: 2px var(--ink); paint-order: stroke fill; }
+.subcover h1 .br { background: none; color: var(--ink); padding: 0; font-weight: 400; }
+.glyph-unused { position: absolute; right: -6%; bottom: -18%; width: 52%; opacity: .1; pointer-events: none; }
+
+/* História */
+.story { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(10px, 1.6cqw, 20px); }
+.beat { border-top: 2px solid rgba(206,255,0,.18); padding-top: 12px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.beat .t { font-family: var(--mono); font-size: clamp(11px, 1.1cqw, 13px); color: var(--lime); }
+.beat p { font-size: clamp(12px, 1.25cqw, 16px); line-height: 1.45; }
+
+.gargalos { display: flex; flex-direction: column; gap: 14px; background: var(--ink-2); border-radius: 10px; padding: 20px 24px; }
+.gargalos h3 { font-size: 11px; letter-spacing: .26em; text-transform: uppercase; font-weight: 700; color: var(--lime); }
+.g-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; }
+.g { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.g b { font-size: 34px; font-weight: 700; letter-spacing: -.03em; line-height: 1; color: var(--on-dark); font-variant-numeric: tabular-nums; }
+.g p { font-size: 14px; line-height: 1.45; color: #C9CCBF; }
+
+/* Números */
+.nums { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(12px, 2cqw, 28px); align-items: end; }
+.num b { display: block; font-size: clamp(40px, 7cqw, 104px); font-weight: 700; letter-spacing: -.04em; line-height: .9; font-variant-numeric: tabular-nums; }
+.num span { display: block; margin-top: 10px; font-size: clamp(12px, 1.25cqw, 16px); line-height: 1.4; max-width: 24ch; }
+.dark .num b { color: var(--lime); }
+.team { display: flex; gap: 10px; flex-wrap: wrap; }
+.person { display: flex; align-items: center; gap: 10px; border: 1px solid rgba(247,248,242,.18); border-radius: 999px; padding: 6px 14px 6px 6px; font-size: clamp(11px, 1.1cqw, 14px); }
+.person .bar { width: 42px; height: 8px; border-radius: 4px; background: rgba(247,248,242,.15); overflow: hidden; }
+.person .bar i { display: block; height: 100%; background: var(--lime); }
+
+/* Custo invisível */
+.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(16px, 3cqw, 40px); align-items: stretch; }
+.col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.col h3 { font-size: 12px; letter-spacing: .22em; text-transform: uppercase; font-weight: 700; }
+.list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.list li { font-size: clamp(12px, 1.3cqw, 16px); line-height: 1.4; padding: 10px 14px; border-radius: 6px; background: var(--lime-soft); }
+.list.off li { background: #F1F2EC; color: var(--gray); text-decoration: line-through; text-decoration-color: rgba(91,94,82,.5); }
+
+/* Fluxo */
+.flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(8px, 1.4cqw, 16px); }
+.step { background: var(--ink-2); border-radius: 8px; padding: clamp(12px, 1.6cqw, 20px); display: flex; flex-direction: column; gap: 8px; min-width: 0; position: relative; }
+.step .k { font-family: var(--mono); font-size: 12px; color: var(--lime); }
+.step h3 { font-size: clamp(14px, 1.6cqw, 20px); font-weight: 600; line-height: 1.2; color: var(--on-dark); }
+.step p { font-size: clamp(11px, 1.15cqw, 14px); line-height: 1.45; color: #C9CCBF; }
+.routes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.chip { font-family: var(--mono); font-size: 11px; padding: 3px 8px; border-radius: 4px; background: var(--lime); color: var(--ink); }
+.chip.alt { background: transparent; color: var(--on-dark); border: 1px solid rgba(247,248,242,.3); }
+.prompt { background: var(--ink-2); border: 1px solid rgba(206,255,0,.35); border-radius: 8px; padding: 12px 16px; font-family: var(--mono); font-size: clamp(11px, 1.2cqw, 14px); color: var(--on-dark); line-height: 1.5; }
+.prompt b { color: var(--lime); font-weight: 500; }
+
+/* Ganhos */
+.gains { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(10px, 1.8cqw, 22px); }
+.gain { border: 1px solid var(--lime-line); border-radius: 8px; padding: clamp(14px, 1.8cqw, 22px); display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.gain.hl { background: var(--ink); color: var(--on-dark); border-color: var(--ink); }
+.gain h3 { font-size: clamp(15px, 1.7cqw, 22px); font-weight: 700; }
+.gain .who { font-size: 11px; letter-spacing: .22em; text-transform: uppercase; font-weight: 700; color: var(--gray); }
+.gain.hl .who { color: var(--lime); }
+.gain ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: clamp(12px, 1.2cqw, 15px); line-height: 1.4; }
+
+/* Governança */
+.gov { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: clamp(16px, 3cqw, 40px); align-items: center; }
+.panel { background: var(--ink-2); border-radius: 10px; padding: clamp(12px, 1.6cqw, 20px); display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.panel .ph { display: flex; justify-content: space-between; font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: #B9BCAE; }
+.prow { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 2fr) auto; gap: 10px; align-items: center; font-size: clamp(11px, 1.15cqw, 14px); color: var(--on-dark); }
+.prow .bar { height: 8px; background: rgba(247,248,242,.1); border-radius: 4px; overflow: hidden; }
+.prow .bar i { display: block; height: 100%; background: var(--lime); border-radius: 4px; }
+.prow .v { font-family: var(--mono); font-variant-numeric: tabular-nums; color: #C9CCBF; font-size: 12px; }
+.feats { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.feats li { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; font-size: clamp(12px, 1.3cqw, 16px); line-height: 1.4; color: var(--on-dark); }
+.feats li::before { content: ""; width: 12px; height: 12px; margin-top: 4px; background: var(--lime); border-radius: 2px; }
+
+/* Por que o KEV Studio */
+.vs { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: clamp(14px, 2.2cqw, 28px); align-items: stretch; }
+.vcol { border-radius: 10px; padding: clamp(16px, 2cqw, 26px); display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.vcol.v-gen { background: #F1F2EC; color: var(--gray); }
+.vcol.v-kev { background: var(--ink); color: var(--on-dark); }
+.vcol .who { font-size: 11px; letter-spacing: .22em; text-transform: uppercase; font-weight: 700; }
+.vcol.v-kev .who { color: var(--lime); }
+.vcol h3 { font-size: clamp(15px, 1.7cqw, 22px); font-weight: 700; line-height: 1.2; }
+.vcol.v-gen h3 { color: var(--ink); }
+.vcol ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
+.vcol li { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; font-size: clamp(12px, 1.2cqw, 15px); line-height: 1.4; }
+.vcol.v-gen li::before { content: "×"; font-family: var(--mono); color: #9A9D90; line-height: 1.3; }
+.vcol.v-kev li::before { content: ""; width: 11px; height: 11px; margin-top: 4px; background: var(--lime); border-radius: 2px; }
+.vcol li b { font-weight: 700; }
+.vcol.v-kev li b { color: var(--lime); }
+.agents { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 12px; border-top: 1px solid rgba(206,255,0,.25); margin-top: auto; }
+
+/* Recorrente */
+.rec { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid rgba(206,255,0,.3); padding-top: 14px; }
+.rech { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+.rech .rk { font-size: 11px; letter-spacing: .22em; text-transform: uppercase; font-weight: 700; color: var(--lime); }
+.rech .rbase { font-family: var(--mono); font-size: 12px; color: #C9CCBF; }
+.scen { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.sc2 { background: var(--ink-2); border-radius: 8px; padding: 12px 16px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.sc2 .sk { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; font-weight: 700; color: #B9BCAE; }
+.sc2 b { font-size: clamp(20px, 2.2cqw, 28px); font-weight: 700; letter-spacing: -.02em; color: var(--on-dark); font-variant-numeric: tabular-nums; }
+.sc2 b em { font-style: normal; font-size: .5em; font-weight: 500; color: #B9BCAE; margin-left: 4px; }
+.sc2 p { font-size: 12px; line-height: 1.45; color: #C9CCBF; }
+.rec .small { max-width: none; }
+#investimento .body { gap: 18px; }
+#investimento .costs td { padding: 6px 0; }
+#investimento .total b { font-size: clamp(40px, 6.4cqw, 92px); }
+
+/* Stack */
+.stack { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(8px, 1.3cqw, 14px); }
+.tech { border: 1px solid var(--lime-line); border-radius: 8px; padding: clamp(10px, 1.4cqw, 16px); display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.tech .layer { font-size: 10px; letter-spacing: .22em; text-transform: uppercase; font-weight: 700; color: var(--gray); }
+.tech h3 { font-size: clamp(14px, 1.55cqw, 19px); font-weight: 700; }
+.tech h3 a { color: inherit; text-decoration: underline; text-decoration-color: var(--lime); text-decoration-thickness: 3px; text-underline-offset: 3px; }
+.tech h3 a:hover { background: var(--lime-soft); }
+.tech p { font-size: clamp(11px, 1.1cqw, 13.5px); line-height: 1.4; color: var(--gray); }
+.tech.own { background: var(--lime); border-color: var(--lime); }
+.tech.own p, .tech.own .layer { color: var(--ink); }
+
+/* Investimento */
+.invest { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: clamp(16px, 3cqw, 44px); align-items: center; }
+.total b { display: block; font-size: clamp(44px, 7.6cqw, 112px); font-weight: 800; letter-spacing: -.045em; line-height: .9; color: var(--lime); font-variant-numeric: tabular-nums; }
+.total span { display: block; margin-top: 12px; font-size: clamp(12px, 1.3cqw, 16px); color: #C9CCBF; max-width: 30ch; line-height: 1.45; }
+.costs { width: 100%; border-collapse: collapse; font-size: clamp(11px, 1.2cqw, 15px); color: var(--on-dark); }
+.costs td { padding: 9px 0; border-bottom: 1px solid rgba(247,248,242,.12); vertical-align: top; }
+.costs td:last-child { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; padding-left: 12px; }
+.costs td small { display: block; color: #9EA295; font-size: .85em; }
+.costs tr.sum td { border-bottom: 0; border-top: 2px solid var(--lime); font-weight: 700; color: var(--lime); padding-top: 12px; }
+.costs a { color: inherit; text-decoration: underline; text-decoration-color: var(--lime); text-underline-offset: 3px; }
+
+/* Cronograma */
+.timeline { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: clamp(6px, 1cqw, 12px); }
+.day { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.day .d { font-family: var(--mono); font-size: 12px; font-weight: 500; padding: 6px 10px; border-radius: 4px; background: var(--ink); color: var(--lime); }
+.day.go .d { background: var(--lime); color: var(--ink); }
+.day h3 { font-size: clamp(13px, 1.45cqw, 18px); font-weight: 700; line-height: 1.2; }
+.day ul { margin: 0; padding-left: 16px; display: grid; gap: 4px; font-size: clamp(11px, 1.08cqw, 13.5px); line-height: 1.4; color: var(--gray); }
+.d0 { display: flex; align-items: center; gap: 12px; font-size: clamp(11px, 1.15cqw, 14px); }
+.d0 .chip { flex: none; }
+
+/* Impacto */
+.impact { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(16px, 3cqw, 44px); align-items: center; }
+.scen { display: grid; gap: 10px; }
+.sc { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 16px; align-items: center; }
+.sc .lbl { font-size: clamp(12px, 1.25cqw, 15px); }
+.sc .val { font-family: var(--mono); font-size: clamp(12px, 1.25cqw, 15px); font-variant-numeric: tabular-nums; }
+.sc .track { grid-column: 1 / -1; height: 14px; border-radius: 3px; background: rgba(14,15,11,.1); overflow: hidden; }
+.sc .track i { display: block; height: 100%; background: var(--ink); }
+.unlock { display: flex; flex-wrap: wrap; gap: 8px; }
+.unlock span { border: 1.5px solid var(--ink); border-radius: 999px; padding: 6px 14px; font-size: clamp(12px, 1.25cqw, 15px); font-weight: 600; }
+
+/* Pedido */
+.ask .body { align-items: flex-start; }
+.ask ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; counter-reset: a; }
+.ask li { counter-increment: a; display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 12px; align-items: baseline; font-size: clamp(13px, 1.45cqw, 19px); line-height: 1.4; color: var(--on-dark); }
+.ask li::before { content: counter(a); font-family: var(--mono); color: var(--ink); background: var(--lime); border-radius: 4px; text-align: center; font-size: 13px; padding: 2px 0; }
+
+.nav { opacity: .35; transition: opacity .2s; position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 6px; z-index: 5; }
+.nav button { font: 600 12px var(--mono); border: 0; border-radius: 6px; padding: 10px 14px; background: var(--ink); color: var(--lime); cursor: pointer; }
+.nav button:hover { background: var(--ink-2); }
+.nav button:focus-visible, a:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+.nav .ct { font: 500 12px var(--mono); background: var(--paper); color: var(--ink); border-radius: 6px; padding: 10px 12px; font-variant-numeric: tabular-nums; }
+
+
+
+.nav:hover, .nav:focus-within { opacity: 1; }
+
+/* Animações de entrada: só rodam no slide ativo; sem JS, tudo fica visível */
+.rv { opacity: 0; }
+.slide.on .rv.go { animation: rise .7s cubic-bezier(.2,.75,.2,1) both; animation-delay: var(--d, 0ms); }
+.slide.on .grow.go { animation: grow 1s cubic-bezier(.2,.75,.2,1) both; animation-delay: var(--d, 0ms); transform-origin: left center; }
+.slide.on .pop.go { animation: pop .6s cubic-bezier(.3,1.4,.4,1) both; animation-delay: var(--d, 0ms); }
+@keyframes rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+@keyframes grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes pop { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: none; } }
+.beat { position: relative; }
+.beat::before { content: ""; position: absolute; left: 0; top: -2px; height: 2px; width: 100%; background: var(--lime); transform-origin: left; }
+.slide.on .beat.go::before { animation: grow .7s linear both; animation-delay: var(--d, 0ms); }
+.js .frag:not(.shown) { visibility: hidden; }
+.slide.on .frag.shown { animation: rise .6s cubic-bezier(.2,.75,.2,1) both; }
+@media (prefers-reduced-motion: reduce) { .rv { opacity: 1; } .slide.on .frag.shown { animation: none; } .slide.on .rv.go, .slide.on .grow.go, .slide.on .pop.go, .slide.on .beat.go::before { animation: none; } }
+
+/* ===== Telas do KEV Studio (mockups) ===== */
+.shotcol { max-width: 470px; justify-content: center; }
+.top-al { justify-content: flex-start; padding-top: 18px; flex: none; }
+.gov.solo { grid-template-columns: minmax(0, 1fr); max-width: 520px; }
+.shot { position: absolute; z-index: 0; pointer-events: none; }
+.tilt { transform-origin: left top; }
+.s1 { left: 590px; top: 104px; } .s1 .tilt { transform: perspective(2200px) rotateY(-13deg) scale(.8); }
+.s2 { left: 64px; top: 222px; } .s2 .tilt { transform: scale(.96); }
+.s3 { left: 640px; top: 110px; } .s3 .tilt { transform: perspective(2200px) rotateY(-13deg) scale(.8); } .s3 .app { height: 540px; }
+.s3 { top: 150px; }
+.slide .body, .slide .top { position: relative; z-index: 1; }
+.demo { position: absolute; left: 64px; bottom: 30px; font-size: 11px; color: rgba(14,15,11,.6); z-index: 1; }
+.demo.on-dark { color: #9EA295; }
+.slide.on .shot.rv.go { animation-name: shotin; animation-duration: 1s; }
+@keyframes shotin { from { opacity: 0; transform: translate(70px, 20px); } to { opacity: 1; transform: none; } }
+
+.app { width: 1120px; height: 700px; display: grid; grid-template-columns: 206px minmax(0, 1fr); background: #F5F6F0; border-radius: 18px; overflow: hidden; font-family: var(--font); color: var(--ink); text-align: left; box-shadow: 0 40px 90px rgba(14,15,11,.35), 0 0 0 1px rgba(14,15,11,.08); }
+.side { background: #FFFFFF; border-right: 1px solid #E6E8DE; padding: 20px 14px; display: flex; flex-direction: column; gap: 4px; }
+.brand { display: flex; align-items: center; gap: 8px; padding: 2px 8px 16px; }
+.brand svg { width: 56px; height: auto; fill: var(--ink); }
+.brand span { font-family: var(--mono); font-size: 11px; background: var(--lime); padding: 2px 7px; border-radius: 4px; }
+.search { display: flex; justify-content: space-between; font-size: 11px; color: #8A8D80; border: 1px solid #E6E8DE; border-radius: 8px; padding: 7px 10px; margin-bottom: 8px; }
+.navh { font-size: 9px; letter-spacing: .2em; text-transform: uppercase; color: #9A9D90; margin: 12px 8px 4px; font-weight: 700; }
+.nv { display: flex; align-items: center; gap: 10px; font-size: 12.5px; font-weight: 500; padding: 8px 10px; border-radius: 8px; color: #3D4036; }
+.nv.on { background: var(--ink); color: #FFFFFF; }
+.nv .ic { width: 13px; height: 13px; border-radius: 4px; border: 1.5px solid currentColor; opacity: .75; flex: none; }
+.nv.on .ic { border-color: var(--lime); opacity: 1; }
+.nv .bd { margin-left: auto; font-size: 10px; background: var(--lime); color: var(--ink); border-radius: 10px; padding: 1px 7px; }
+.user { margin-top: auto; display: flex; gap: 10px; align-items: center; padding: 10px; border: 1px solid #E6E8DE; border-radius: 10px; font-size: 11.5px; font-weight: 600; }
+.user small { display: block; font-weight: 400; color: #8A8D80; font-size: 10px; }
+.av { width: 28px; height: 28px; border-radius: 50%; background: var(--lime); display: grid; place-items: center; font-weight: 700; font-size: 10.5px; color: var(--ink); flex: none; }
+.appmain { padding: 24px 28px; display: flex; flex-direction: column; gap: 16px; min-width: 0; overflow: hidden; }
+.ahead { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.ahead small { font-size: 11px; color: #8A8D80; }
+.ahead h4 { margin: 3px 0 0; font-size: 23px; font-weight: 700; letter-spacing: -.02em; }
+.ahead p { margin: 4px 0 0; font-size: 12px; color: #6B6E62; }
+.tico { display: flex; gap: 10px; align-items: center; }
+.tico i { width: 28px; height: 28px; border-radius: 50%; border: 1px solid #E1E3D9; background: #FFFFFF; }
+.card { background: #FFFFFF; border: 1px solid #E6E8DE; border-radius: 14px; padding: 16px; min-width: 0; }
+.ch { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.ch h5, .und h5 { margin: 0; font-size: 13px; font-weight: 700; }
+.ch span { font-size: 11px; color: #6B6E62; text-decoration: underline; text-decoration-color: var(--lime); text-decoration-thickness: 2px; }
+.pill { font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+.pill.ok { background: #EAFBC9; color: #3B5600; }
+.pill.mk { background: #EEF0E8; color: #55584C; }
+.pill.run { background: var(--ink); color: var(--lime); }
+.btn { display: inline-flex; align-items: center; gap: 6px; background: var(--ink); color: #FFFFFF; font-size: 12px; font-weight: 600; border-radius: 9px; padding: 9px 16px; white-space: nowrap; }
+.btn.lime { background: var(--lime); color: var(--ink); }
+.btn.ghost { background: #FFFFFF; color: var(--ink); border: 1px solid #DEE0D5; }
+.askbox { border: 1.5px solid var(--ink); padding: 18px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 0 0 4px rgba(206,255,0,.45); }
+.typed { margin: 0; font-size: 15px; line-height: 1.5; min-height: 45px; }
+.typed::after { content: ""; display: inline-block; width: 2px; height: 1.05em; background: var(--ink); margin-left: 2px; vertical-align: -2px; animation: caret 1s steps(1) infinite; }
+@keyframes caret { 50% { opacity: 0; } }
+.askfoot { display: flex; align-items: center; gap: 10px; }
+.att { font-size: 11px; color: #55584C; border: 1px solid #E1E3D9; border-radius: 999px; padding: 5px 11px; }
+.askfoot .btn { margin-left: auto; }
+.sugs { display: flex; gap: 8px; flex-wrap: wrap; }
+.sugs span { font-size: 11px; padding: 6px 12px; border-radius: 999px; background: #FFFFFF; border: 1px solid #E1E3D9; color: #3D4036; }
+.row2 { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 14px; }
+.rq { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 9px 0; border-top: 1px solid #F0F1EA; }
+.ty { font-family: var(--mono); font-size: 9.5px; font-weight: 500; background: #F3F4EE; border-radius: 7px; height: 30px; display: grid; place-items: center; }
+.rt { font-size: 12.5px; font-weight: 600; min-width: 0; }
+.rt small { display: block; font-weight: 400; color: #8A8D80; font-size: 10.5px; margin-top: 1px; }
+.quota small { font-size: 11px; color: #8A8D80; }
+.quota > b { display: block; font-size: 30px; letter-spacing: -.03em; margin: 6px 0 10px; }
+.quota > b em { font-style: normal; font-size: 12px; font-weight: 500; color: #6B6E62; letter-spacing: 0; }
+.ubar { display: block; height: 8px; border-radius: 4px; background: #EEF0E8; overflow: hidden; }
+.ubar i { display: block; height: 100%; background: var(--ink); border-radius: 4px; }
+.qrow { display: flex; justify-content: space-between; font-size: 11.5px; color: #55584C; padding-top: 10px; margin-top: 10px; border-top: 1px solid #F0F1EA; }
+.qrow b { color: var(--ink); }
+.steps { display: flex; gap: 8px; }
+.st { font-size: 11px; font-weight: 600; padding: 7px 12px; border-radius: 8px; background: #FFFFFF; border: 1px solid #E1E3D9; color: #8A8D80; display: flex; align-items: center; gap: 7px; }
+.st::before { content: ""; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid currentColor; }
+.st.done { color: var(--ink); } .st.done::before { background: var(--ink); border-color: var(--ink); }
+.st.run { background: var(--ink); color: #FFFFFF; border-color: var(--ink); } .st.run::before { border-color: var(--lime); background: var(--lime); animation: caret 1s steps(1) infinite; }
+.gen { display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: 14px; }
+.und dl { margin: 12px 0 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 9px 14px; font-size: 12px; }
+.und dt { color: #8A8D80; }
+.und dd { margin: 0; font-weight: 600; }
+.esc { margin: 14px 0 0; padding-top: 12px; border-top: 1px solid #F0F1EA; font-size: 11px; color: #6B6E62; }
+.esc u { color: var(--ink); text-decoration-color: var(--lime); text-decoration-thickness: 2px; }
+.thumbs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-content: start; }
+.th { aspect-ratio: 16 / 9; border-radius: 9px; padding: 12px; display: flex; flex-direction: column; justify-content: flex-end; gap: 4px; overflow: hidden; position: relative; border: 1px solid #E6E8DE; background: #FFFFFF; }
+.th b { font-size: 14px; letter-spacing: -.02em; line-height: 1.1; }
+.th small { font-size: 9.5px; }
+.th.sel { box-shadow: 0 0 0 3px var(--ink); }
+.t1 { background: var(--lime); border-color: var(--lime); }
+.t1 svg { position: absolute; top: 12px; left: 12px; width: 40px; fill: var(--ink); }
+.t1 b { font-size: 17px; }
+.t2 { background: var(--ink); color: #FFFFFF; border-color: var(--ink); justify-content: flex-start; }
+.t2 i { display: block; height: 7px; background: var(--lime); border-radius: 3px; margin-top: 6px; }
+.t3 { justify-content: flex-start; }
+.mg { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 6px; flex: 1; }
+.mg em { background: #F0FCC8; border-radius: 4px; }
+.t4 { justify-content: flex-start; }
+.dots { display: flex; gap: 10px; margin-top: 12px; }
+.dots em { font-style: normal; width: 24px; height: 24px; border-radius: 50%; background: var(--ink); color: var(--lime); font-size: 11px; font-weight: 700; display: grid; place-items: center; }
+.t5 { justify-content: center; align-items: center; background: #F5F6F0; border-style: dashed; color: #6B6E62; }
+.shim { position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(206,255,0,.35) 50%, transparent 70%); background-size: 200% 100%; animation: shim 1.6s linear infinite; }
+@keyframes shim { from { background-position: 150% 0; } to { background-position: -50% 0; } }
+.t5 small { position: relative; font-size: 11px; font-weight: 600; }
+.t6 { justify-content: center; align-items: center; border-style: dashed; color: #8A8D80; font-size: 11px; }
+.actions { display: flex; gap: 10px; justify-content: flex-end; }
+.flt { display: flex; gap: 8px; }
+.flt span { font-size: 11px; padding: 7px 12px; border-radius: 8px; background: #FFFFFF; border: 1px solid #E1E3D9; }
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.kpis small { font-size: 11px; color: #8A8D80; }
+.kpis b { display: block; font-size: 26px; letter-spacing: -.03em; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.kpis .card:first-child { background: var(--lime); border-color: var(--lime); }
+.kpis .card:first-child small { color: var(--ink); }
+.r3 { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); }
+.tb { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+.tb th { text-align: left; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: #8A8D80; font-weight: 700; padding: 6px 0 8px; }
+.tb td { padding: 9px 0; border-top: 1px solid #F0F1EA; }
+.tb td:first-child { font-weight: 600; }
+.tb td:last-child { display: flex; align-items: center; gap: 10px; }
+.tb td:last-child .ubar { flex: 1; }
+.tb td em { font-style: normal; font-size: 11px; color: #55584C; width: 32px; text-align: right; }
+.stk { display: flex; height: 14px; border-radius: 7px; overflow: hidden; margin: 12px 0 16px; }
+.stk i:nth-child(1) { background: var(--ink); } .stk i:nth-child(2) { background: #9EBF00; } .stk i:nth-child(3) { background: #DCE8A8; }
+.lg { display: grid; gap: 10px; }
+.lg span { display: flex; align-items: center; gap: 9px; font-size: 12px; }
+.lg b { margin-left: auto; }
+.lg em { width: 10px; height: 10px; border-radius: 3px; }
+.lg .c1 { background: var(--ink); } .lg .c2 { background: #9EBF00; } .lg .c3 { background: #DCE8A8; }
+
+/* Gantt */
+.gantt { display: grid; grid-template-columns: 380px minmax(0, 1fr); row-gap: 6px; align-items: center; }
+.gdays, .gtrack { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); column-gap: 0; height: 100%; position: relative; }
+.gdays span { font-family: var(--mono); font-size: 12px; font-weight: 500; padding: 6px 10px; border-left: 1px solid var(--lime-line); }
+.gdays .d0h { color: var(--gray); }
+.gtrack { height: 30px; background-image: linear-gradient(to right, transparent 75%, var(--lime-line) 75%, var(--lime-line) calc(75% + 1px), transparent calc(75% + 1px)), repeating-linear-gradient(to right, var(--lime-line) 0 1px, transparent 1px calc(100% / 6)); background-size: 100% 100%, 75% 100%; background-repeat: no-repeat; }
+.gdays .w2 { font-weight: 700; }
+.gh .wk { display: none; }
+.gl { font-size: 14px; line-height: 1.25; display: flex; align-items: baseline; gap: 10px; white-space: nowrap; }
+.gl em { font-style: normal; font-size: 10px; letter-spacing: .2em; text-transform: uppercase; font-weight: 700; color: var(--gray); width: 86px; flex: none; }
+.gh { height: 1px; }
+.gbar { grid-row: 1; height: 22px; align-self: center; margin: 0 6px; border-radius: 5px; background: var(--lime); }
+.gbar.out { background: transparent; border: 1.5px dashed var(--ink); }
+.gbar.ink { background: var(--ink); }
+.gms { grid-row: 1; align-self: center; justify-self: end; flex-direction: row-reverse; display: flex; align-items: center; gap: 10px; margin-right: 6px; font-family: var(--mono); font-size: 12px; font-weight: 500; }
+.gms i { width: 16px; height: 16px; background: var(--ink); transform: rotate(45deg); border-radius: 2px; box-shadow: 0 0 0 4px var(--lime); }
+.ih { font-size: 12px; letter-spacing: .22em; text-transform: uppercase; font-weight: 700; }
+
+/* Tela 2: editor com conversa e prévia */
+.appmain.ed { gap: 14px; }
+.edhead { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; }
+.edhead small { font-size: 11px; color: #8A8D80; }
+.edhead h4 { margin: 3px 0 0; font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
+.edact { display: flex; align-items: center; gap: 8px; }
+.edgrid { display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 16px; align-items: start; }
+.thread { background: #FFFFFF; border: 1px solid #E6E8DE; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 14px; }
+.msg { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; font-size: 12px; line-height: 1.5; }
+.msg p { margin: 0; }
+.msg small { display: block; margin-top: 4px; font-size: 10px; color: #9A9D90; }
+.msg.me > div p { background: #F3F4EE; border-radius: 4px 12px 12px 12px; padding: 9px 11px; }
+.aimark { width: 28px; height: 28px; border-radius: 50%; background: var(--ink); display: grid; place-items: center; }
+.aimark svg { width: 16px; fill: var(--lime); }
+.chk { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 5px; }
+.chk li { display: flex; gap: 7px; align-items: center; font-size: 11.5px; color: #3D4036; }
+.chk li::before { content: ""; width: 12px; height: 12px; border-radius: 50%; background: var(--lime); box-shadow: inset 0 0 0 3px #FFFFFF, 0 0 0 1px var(--ink); flex: none; }
+.msg .esc { margin: 10px 0 0; padding: 0; border: 0; font-size: 11px; color: #6B6E62; }
+.refine { display: flex; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid #DEE0D5; border-radius: 10px; padding: 8px 8px 8px 12px; font-size: 11px; color: #9A9D90; }
+.refine i { font-style: normal; width: 26px; height: 26px; border-radius: 7px; background: var(--lime); color: var(--ink); display: grid; place-items: center; font-weight: 700; flex: none; }
+.canvas { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.pv { position: relative; aspect-ratio: 16 / 9; background: var(--ink); border-radius: 12px; padding: 26px 30px; display: flex; flex-direction: column; justify-content: center; gap: 12px; color: #FFFFFF; overflow: hidden; box-shadow: 0 10px 30px rgba(14,15,11,.18); }
+.pvl { position: absolute; top: 22px; left: 30px; }
+.pvl svg { width: 52px; fill: #FFFFFF; display: block; }
+.pvtag { font-family: var(--mono); font-size: 11px; color: var(--lime); letter-spacing: .08em; }
+.pvt { margin: 0; font-size: 30px; font-weight: 600; line-height: 1.08; letter-spacing: -.03em; max-width: 15ch; }
+.pvt em { font-style: normal; font-family: var(--mono); font-weight: 400; color: var(--lime); }
+.pvi { display: flex; gap: 18px; margin-top: 6px; }
+.pvi span { display: flex; gap: 7px; align-items: center; font-size: 11px; color: #C9CCBF; }
+.pvi i { width: 8px; height: 8px; border-radius: 2px; background: var(--lime); flex: none; }
+.pvn { position: absolute; right: 26px; bottom: 18px; font-family: var(--mono); font-size: 10px; color: #8A8D80; }
+.strip { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.mi { aspect-ratio: 16 / 9; border-radius: 6px; padding: 7px; overflow: hidden; display: flex; flex-direction: column; justify-content: center; gap: 3px; background: #FFFFFF; border: 1px solid #E6E8DE; }
+.mi b { font-size: 7.5px; line-height: 1.15; letter-spacing: -.01em; }
+.mi.sel { outline: 2px solid var(--ink); outline-offset: 2px; }
+.m1 { background: var(--ink); color: #FFFFFF; border-color: var(--ink); }
+.m2 { justify-content: flex-start; }
+.m2 i { display: block; height: 3px; border-radius: 2px; background: var(--lime); width: 70%; }
+.m2 i + i { width: 55%; } .m2 i + i + i { width: 40%; }
+.m3 { background: var(--lime); border-color: var(--lime); justify-content: flex-start; }
+.m3 span { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; flex: 1; }
+.m3 em { background: rgba(255,255,255,.7); border-radius: 2px; }
+.m4 { justify-content: flex-start; }
+.d3 { display: flex; gap: 4px; margin-top: 4px; }
+.d3 em { width: 9px; height: 9px; border-radius: 50%; background: var(--ink); }
+.m5 { background: #F3F4EE; }
+
+.res { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.r { background: var(--ink); color: var(--on-dark); border-radius: 12px; padding: 22px 20px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.r b { font-size: 40px; font-weight: 700; letter-spacing: -.035em; line-height: 1; color: var(--lime); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.r p { margin: 0; font-size: 14px; line-height: 1.45; color: #C9CCBF; }
+.rk { font-size: 10.5px; letter-spacing: .24em; text-transform: uppercase; font-weight: 700; }
+.r .rk { color: var(--on-dark); opacity: .7; }
+.dest { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+
+.endnote .body, .endlogo .body { align-items: center; justify-content: center; text-align: center; gap: 18px; }
+.en-k { font-family: var(--mono); font-size: 16px; color: #B9BCAE; letter-spacing: .04em; }
+.endnote h1 { font-size: 88px; font-weight: 700; letter-spacing: -.045em; line-height: 1; color: var(--on-dark); }
+.endnote h1 span { color: var(--lime); }
+.endlogo .logo.big { width: 520px; }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="kev" viewBox="0 0 1061.51 226.26"><g><rect x="437.28" y="3.15" width="45.36" height="220.32"/><path d="M616.22 225.9 513.23 156.71C511.22 155.23 490.34 139.25 490.89 111.59 491.41 85.42 510.68 70.54 513.01 68.81L615.66 0 641.29 38.1 542.88 104.06C540.01 105.99 538.28 109.22 538.28 112.68 538.28 116.14 540 119.37 542.88 121.3L641.49 187.39 616.23 225.9Z"/><path d="M1013.1 3.15C1013.1 3.15 971.16 123.8 956.63 165.6 955.02 170.24 948.46 170.21 946.84 165.57L890.38 3.15 841.97 3.15 911.99 195.52C918 212.25 933.96 223.47 951.74 223.47 969.52 223.47 985.47 212.25 991.49 195.52L1061.51 3.15 1013.1 3.15Z"/><path d="M855.56 113.38C855.56 51.54 811.76 0 747.77 0 680.34 0 634.39 49.39 634.39 112.95 634.39 176.51 680.34 225.9 751.2 225.9 793.29 225.9 825.5 208.29 845.25 179.09L807.03 156.76C796.72 171.79 777.4 183.39 751.63 183.39 717.92 183.39 691.25 166.84 683.36 134.57L834.81 134.57C846.27 134.57 855.55 125.28 855.55 113.83L855.55 113.39ZM811.78 93.08 682.88 93.08C689.84 61.92 713.21 42.08 747.33 42.08 781.45 42.08 804.82 61.92 811.78 93.08Z"/></g><g><path d="M125.34 226.26 22.35 157.07C20.35 155.59-0.54 139.61 0.01 111.95 0.53 85.78 19.8 70.9 22.13 69.17L124.77 0.36 150.4 38.46 51.99 104.42C49.12 106.35 47.39 109.58 47.39 113.04 47.39 116.5 49.11 119.73 51.99 121.66L150.6 187.75 125.34 226.26Z"/><path d="M221.21 226.26 324.2 157.07C326.21 155.59 347.09 139.61 346.54 111.95 346.02 85.78 326.75 70.9 324.42 69.17L221.78 0.36 196.15 38.46 294.56 104.42C297.43 106.35 299.16 109.58 299.16 113.04 299.16 116.5 297.44 119.73 294.56 121.66L195.95 187.75 221.21 226.26Z"/><circle cx="173.28" cy="113.31" r="37.11"/></g></symbol>
+  <symbol id="kev-mark" viewBox="0 0 347 227"><path d="M125.34 226.26 22.35 157.07C20.35 155.59-.54 139.61 0.01 111.95 0.53 85.78 19.8 70.9 22.13 69.17L124.77 0.36 150.4 38.46 51.99 104.42C49.12 106.35 47.39 109.58 47.39 113.04 47.39 116.5 49.11 119.73 51.99 121.66L150.6 187.75 125.34 226.26Z"/><path d="M221.21 226.26 324.2 157.07C326.21 155.59 347.09 139.61 346.54 111.95 346.02 85.78 326.75 70.9 324.42 69.17L221.78 0.36 196.15 38.46 294.56 104.42C297.43 106.35 299.16 109.58 299.16 113.04 299.16 116.5 297.44 119.73 294.56 121.66L195.95 187.75 221.21 226.26Z"/><circle cx="173.28" cy="113.31" r="37.11"/></symbol>
+</svg>
+
+<main class="deck" id="deck">
+
+<!-- 1 Capa -->
+<section class="slide lime cover" id="capa" aria-label="Capa">
+  <div class="body">
+    <div class="lockup">
+      <svg class="logo big" role="img" aria-label="KEV" viewBox="0 0 1061.51 226.26"><use href="#kev"/></svg>
+      <p class="sign" aria-label="Marketing"><span aria-hidden="true">M</span><span aria-hidden="true">A</span><span aria-hidden="true">R</span><span aria-hidden="true">K</span><span aria-hidden="true">E</span><span aria-hidden="true">T</span><span aria-hidden="true">I</span><span aria-hidden="true">N</span><span aria-hidden="true">G</span></p>
+    </div>
+  </div>
+  <div class="meta"><span>Outubro de 2026</span></div>
+</section>
+
+<!-- 2 Subcapa -->
+<section class="slide lime subcover" id="subcapa" aria-label="Subcapa">
+  <div class="body">
+    <h1>E se o nosso time tivesse mais <span class="chipword"><i>&lt;</i>tempo<i>&gt;</i></span> para o que realmente move a KEV?</h1>
+  </div>
+</section>
+
+<!-- 2 História -->
+<section class="slide dark" id="historia" aria-label="A história">
+  <div class="body">
+    <h2>Fluxo <span class="br">atual</span></h2>
+    <div class="story">
+      <div class="beat"><span class="t">Dia 1 · 09h00</span><p>Área de negócio solicita 6 slides para reunião com parceiro.</p></div>
+      <div class="beat"><span class="t">Dia 1 · 09h15</span><p>Entra na fila de produção.</p></div>
+      <div class="beat"><span class="t">Dia 2 · 15h00</span><p>Analista sênior produz e ajusta o material.</p></div>
+      <div class="beat"><span class="t">Dia 3 · 14h00</span><p>Material entregue. Prazo médio: 2,5 dias.</p></div>
+    </div>
+    <div class="gargalos frag">
+      <h3>Gargalos identificados</h3>
+      <div class="g-grid">
+        <div class="g"><b>2,5 dias</b><p>de espera em solicitações aparentemente simples podem levar o solicitante à frustração.</p></div>
+        <div class="g"><b>70%</b><p>do tempo dos analistas sêniores é consumido por esse tipo de demanda.</p></div>
+        <div class="g"><b>224h/mês</b><p>de capacidade sênior dedicadas à produção operacional.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 5 A ideia -->
+<section class="slide lime" id="ideia" aria-label="Solução proposta">
+  <div class="top"><span class="tag">Solução proposta</span><i></i><span class="pg">02</span></div>
+  <div class="body shotcol">
+    <h2>KEV Studio. Autoatendimento com IA para as áreas.</h2>
+    <p class="lead">Atende demandas de menor complexidade: apresentações, artes e ajustes de documentos. A área descreve a necessidade e a IA produz o material na identidade KEV.</p>
+    <p class="lead">Campanhas, vídeos e peças de maior complexidade ou impacto seguem com o time de Marketing, com briefing estruturado pela IA.</p>
+  </div>
+  <div class="shot s1" aria-label="Tela de novo pedido do KEV Studio"><div class="tilt"><div class="app"><aside class="side"><div class="brand"><svg viewBox="0 0 1061.51 226.26" aria-hidden="true"><use href="#kev"/></svg><span>Studio</span></div><div class="search"><span>Buscar</span><span>⌘K</span></div><p class="navh">Criar</p><div class="nv on"><i class="ic"></i>Novo pedido</div><div class="nv"><i class="ic"></i>Meus pedidos<b class="bd">3</b></div><div class="nv"><i class="ic"></i>Biblioteca</div><div class="nv"><i class="ic"></i>Templates KEV</div><p class="navh">Gestão</p><div class="nv"><i class="ic"></i>Consumo</div><div class="nv"><i class="ic"></i>Fila do Marketing</div><div class="user"><span class="av">MA</span><span>Mariana Alves<small>Comercial</small></span></div></aside><main class="appmain">
+  <div class="ahead"><div><small>Bom dia, Mariana</small><h4>O que você precisa criar hoje?</h4><p>Descreva o material. A IA entende, direciona e cria na identidade KEV.</p></div><div class="tico"><i></i><span class="av">MA</span></div></div>
+  <div class="card askbox"><p class="typed" data-type="Preciso de 5 slides apresentando o Seguro Viagem para o time comercial de um parceiro, com benefícios, coberturas e um slide de contato.">Preciso de 5 slides apresentando o Seguro Viagem para o time comercial de um parceiro, com benefícios, coberturas e um slide de contato.</p>
+    <div class="askfoot"><span class="att">+ Anexar arquivo</span><span class="att">Tom: consultivo</span><span class="btn lime">Criar com IA →</span></div></div>
+  <div class="sugs"><span>Apresentação comercial</span><span>Arte para comunicado</span><span>E-mail para parceiros</span><span>Convite de evento</span><span>Post interno</span></div>
+  <div class="row2">
+    <div class="card"><div class="ch"><h5>Pedidos recentes</h5><span>Ver todos</span></div>
+      <div class="rq"><span class="ty">APR</span><span class="rt">Apresentação Parcerias Q4<small>Hoje, 09:12 · 8 slides</small></span><span class="pill ok">Pronto</span></div>
+      <div class="rq"><span class="ty">ART</span><span class="rt">Arte Semana da Prevenção<small>Ontem · 3 formatos</small></span><span class="pill ok">Pronto</span></div>
+      <div class="rq"><span class="ty">TXT</span><span class="rt">E-mail de renovação para corretores<small>Ontem · 1 texto</small></span><span class="pill ok">Pronto</span></div>
+      <div class="rq"><span class="ty">APR</span><span class="rt">Campanha de lançamento Vida<small>Seg · demanda estratégica</small></span><span class="pill mk">Com o Marketing</span></div>
+    </div>
+    <div class="card quota"><div class="ch"><h5>Consumo da sua área</h5></div><small>Comercial · outubro</small><b>18 <em>de 40 pedidos</em></b><div class="ubar"><i style="width:45%"></i></div><div class="qrow"><span>Entrega média</span><b>4 min</b></div><div class="qrow"><span>Tokens no mês</span><b>212 mil</b></div></div>
+  </div>
+</main></div></div></div>
+  <p class="demo">Tela conceitual com dados de demonstração.</p>
+</section>
+
+<!-- 6 Como funciona -->
+<section class="slide dark" id="fluxo" aria-label="Como funciona">
+  <div class="top"><span class="tag">Como funciona</span><i></i><svg class="logo" role="img" aria-label="KEV" viewBox="0 0 1061.51 226.26"><use href="#kev"/></svg><span class="pg">03</span></div>
+  <div class="body">
+    <div class="prompt"><b>Pedido:</b> "Preciso de 5 slides apresentando o seguro viagem para o time comercial de um parceiro, com benefícios e um slide de contato."</div>
+    <div class="flow">
+      <div class="step"><span class="k">1 · Pedido</span><h3>O colaborador descreve</h3><p>Texto livre, com anexos se quiser. Sem formulário longo, sem briefing técnico.</p></div>
+      <div class="step"><span class="k">2 · Roteamento</span><h3>A IA entende e direciona</h3><p>Classifica o tipo de material e a complexidade.</p><div class="routes"><span class="chip">Apresentação</span><span class="chip">Arte</span><span class="chip">Texto</span><span class="chip alt">Time Marketing</span></div></div>
+      <div class="step"><span class="k">3 · Criação</span><h3>Gera na identidade KEV</h3><p>Templates, cores, logo e tom de voz oficiais. A pessoa ajusta o que quiser na tela.</p></div>
+      <div class="step"><span class="k">4 · Entrega</span><h3>Baixa e usa</h3><p>Arquivo pronto em minutos. Tudo fica registrado: quem pediu, de qual área, quanto consumiu.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="slide dark" id="tela" aria-label="A experiência">
+  <div class="top"><span class="tag">A experiência</span><i></i><svg class="logo" role="img" aria-label="KEV" viewBox="0 0 1061.51 226.26"><use href="#kev"/></svg><span class="pg">04</span></div>
+  <div class="body top-al">
+    <h2>Do pedido ao material em <span class="br">minutos</span>.</h2>
+  </div>
+  <div class="shot s2" aria-label="Tela de criação de apresentação do KEV Studio"><div class="tilt"><div class="app"><aside class="side"><div class="brand"><svg viewBox="0 0 1061.51 226.26" aria-hidden="true"><use href="#kev"/></svg><span>Studio</span></div><div class="search"><span>Buscar</span><span>⌘K</span></div><p class="navh">Criar</p><div class="nv"><i class="ic"></i>Novo pedido</div><div class="nv on"><i class="ic"></i>Meus pedidos<b class="bd">3</b></div><div class="nv"><i class="ic"></i>Biblioteca</div><div class="nv"><i class="ic"></i>Templates KEV</div><p class="navh">Gestão</p><div class="nv"><i class="ic"></i>Consumo</div><div class="nv"><i class="ic"></i>Fila do Marketing</div><div class="user"><span class="av">MA</span><span>Mariana Alves<small>Comercial</small></span></div></aside><main class="appmain ed">
+  <div class="edhead">
+    <div><small>Meus pedidos / #1284</small><h4>Seguro Viagem para parceiros</h4></div>
+    <div class="edact"><span class="pill ok">Pronto em 2 min</span><span class="btn ghost">Editar</span><span class="btn">Baixar .pptx</span></div>
+  </div>
+  <div class="edgrid">
+    <div class="thread">
+      <div class="msg me"><span class="av">MA</span><div><p>Preciso de 5 slides apresentando o Seguro Viagem para o time comercial de um parceiro, com benefícios, coberturas e contato.</p><small>09:12</small></div></div>
+      <div class="msg ai"><span class="aimark"><svg viewBox="0 0 347 227" aria-hidden="true"><use href="#kev-mark"/></svg></span><div>
+        <p><b>Pronto.</b> Montei 5 slides no template Comercial KEV, com tom consultivo.</p>
+        <ul class="chk"><li>Tipo: apresentação comercial</li><li>Direcionado para: Apresentações</li><li>Base: materiais oficiais do Seguro Viagem</li></ul>
+        <p class="esc">Algo mais elaborado? <u>Encaminhar ao Marketing</u></p>
+        <small>09:14</small></div></div>
+      <div class="refine"><span>Peça um ajuste, ex.: "deixe o slide 3 mais visual"</span><i>↑</i></div>
+    </div>
+    <div class="canvas">
+      <div class="pv">
+        <div class="pvl"><svg viewBox="0 0 1061.51 226.26" aria-hidden="true"><use href="#kev"/></svg></div>
+        <span class="pvtag">SEGURO VIAGEM KEV</span>
+        <p class="pvt">Proteção completa para quem <em>embarca</em>.</p>
+        <div class="pvi"><span><i></i>Despesas médicas no exterior</span><span><i></i>Bagagem extraviada</span><span><i></i>Cancelamento de viagem</span></div>
+        <span class="pvn">01 / 05</span>
+      </div>
+      <div class="strip">
+        <div class="mi m1 sel"><b>Proteção completa para quem embarca.</b></div>
+        <div class="mi m2"><b>Por que oferecer</b><i></i><i></i><i></i></div>
+        <div class="mi m3"><b>Coberturas</b><span><em></em><em></em><em></em><em></em></span></div>
+        <div class="mi m4"><b>Como vender</b><span class="d3"><em></em><em></em><em></em></span></div>
+        <div class="mi m5"><b>Fale com a KEV</b></div>
+      </div>
+    </div>
+  </div>
+</main></div></div></div>
+</section>
+
+<!-- Por que o KEV Studio -->
+<section class="slide" id="porque" aria-label="Por que o KEV Studio">
+  <div class="top"><span class="tag">Por que o KEV Studio</span><i></i><svg class="logo" role="img" aria-label="KEV" viewBox="0 0 1061.51 226.26"><use href="#kev"/></svg><span class="pg">05</span></div>
+  <div class="body">
+    <h2>Por que uma solução <span class="br">proprietária</span></h2>
+    <div class="vs">
+      <div class="vcol v-gen">
+        <span class="who">Ferramentas de IA genéricas</span>
+        <h3>Sem conhecimento da marca KEV</h3>
+        <ul>
+          <li><span>Não são treinadas na identidade visual da KEV</span></li>
+          <li><span>Não asseguram consistência visual e de marca entre os materiais</span></li>
+          <li><span>Dependem de prompts e briefings elaborados pelo usuário</span></li>
+          <li><span>Entregam conteúdo bruto, que exige montagem manual das peças</span></li>
+          <li><span>Operam em contas individuais, sem governança sobre dados e consumo</span></li>
+        </ul>
+      </div>
+      <div class="vcol v-kev">
+        <span class="who">KEV Studio</span>
+        <h3>Agentes especializados na marca KEV</h3>
+        <ul>
+          <li><span><b>Identidade visual:</b> treinamento com logo, paleta, tipografia, templates e tom de voz oficiais</span></li>
+          <li><span><b>Especialização:</b> um agente dedicado a cada tipo de material</span></li>
+          <li><span><b>Consistência de marca:</b> padrão KEV assegurado em todas as peças, independentemente da área solicitante</span></li>
+          <li><span><b>Entrega final:</b> arquivos prontos para uso (.pptx, artes e textos)</span></li>
+          <li><span><b>Governança:</b> login corporativo, histórico de pedidos e consumo por área</span></li>
+        </ul>
+        <div class="agents"><span class="chip">Agente de Apresentações</span><span class="chip">Agente de Artes</span><span class="chip">Agente de Textos</span><span class="chip alt">Agente de Roteamento</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 7 Ganhos -->
+<section class="slide" id="ganhos" aria-label="Quem ganha">
+  <div class="top"><span class="tag">Quem ganha com isso</span><i></i><svg class="logo" role="img" aria-label="KEV" viewBox="0 0 1061.51 226.26"><use href="#kev"/></svg><span class="pg">06</span></div>
+  <div class="body">
+    <h2>Todo mundo sai na frente</h2>
+    <div class="gains">
+      <div class="gain"><span class="who">Para as BUs</span><h3>Autonomia e velocidade</h3><ul><li>Material em minutos, não em dias</li><li>Sem depender da fila do Marketing</li><li>Disponível 24h, inclusive na véspera da reunião</li></ul></div>
+      <div class="gain"><span class="who">Para o Marketing</span><h3>Foco no estratégico</h3><ul><li>Até 224h/mês de sênior devolvidas</li><li>Fila só com o que exige especialista</li><li>Briefings chegam organizados pela IA</li></ul></div>
+      <div class="gain hl"><span class="who">Para a KEV</span><h3>Marca forte e custo sob controle</h3><ul><li>Identidade visual consistente em toda peça</li><li>Mais capacidade sem nova contratação</li><li>Consumo de IA medido por usuário e área</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<!-- 8 Governança -->
+<section class="slide dark" id="governanca" aria-label="Controle e governança">
+  <div class="top"><span class="tag">Controle e governança</span><i></i><svg class="logo" role="img" aria-label="KEV" viewBox="0 0 1061.51 226.26"><use href="#kev"/></svg><span class="pg">07</span></div>
+  <div class="body">
+    <div class="gov solo">
+      <div class="col">
+        <h2>Integrado ao nosso <span class="br">sistema próprio</span></h2>
+        <ul class="feats">
+          <li>Controle de tokens por usuário e por área</li>
+          <li>Número de solicitações por tipo de material e por BU</li>
+          <li>Limites e cotas mensais configuráveis por área</li>
+          <li>Histórico completo de pedidos e materiais gerados</li>
+          <li>Login com a conta corporativa, sem senha nova</li>
+        </ul>
+      </div>
+          </div>
+  </div>
+  <div class="shot s3" aria-label="Tela de consumo do KEV Studio"><div class="tilt"><div class="app"><aside class="side"><div class="brand"><svg viewBox="0 0 1061.51 226.26" aria-hidden="true"><use href="#kev"/></svg><span>Studio</span></div><div class="search"><span>Buscar</span><span>⌘K</span></div><p class="navh">Criar</p><div class="nv"><i class="ic"></i>Novo pedido</div><div class="nv"><i class="ic"></i>Meus pedidos<b class="bd">3</b></div><div class="nv"><i class="ic"></i>Biblioteca</div><div class="nv"><i class="ic"></i>Templates KEV</div><p class="navh">Gestão</p><div class="nv on"><i class="ic"></i>Consumo</div><div class="nv"><i class="ic"></i>Fila do Marketing</div><div class="user"><span class="av">MA</span><span>Mariana Alves<small>Comercial</small></span></div></aside><main class="appmain">
+  <div class="ahead"><div><small>Gestão</small><h4>Consumo e solicitações</h4><p>Dados integrados ao sistema próprio KEV.</p></div><div class="flt"><span>Outubro 2026 ▾</span><span>Todas as áreas ▾</span></div></div>
+  <div class="kpis"><div class="card"><small>Pedidos no mês</small><b>248</b></div><div class="card"><small>Tokens consumidos</small><b>3,1 mi</b></div><div class="card"><small>Entrega média</small><b>4 min</b></div><div class="card"><small>Encaminhados ao Marketing</small><b>9%</b></div></div>
+  <div class="row2 r3">
+    <div class="card"><div class="ch"><h5>Por área</h5><span>Exportar</span></div>
+      <table class="tb"><thead><tr><th>Área</th><th>Pedidos</th><th>Tokens</th><th>Uso da cota</th></tr></thead><tbody><tr><td>Comercial</td><td>86</td><td>1,08 mi</td><td><span class="ubar"><i style="width:86%"></i></span><em>86%</em></td></tr><tr><td>Parcerias</td><td>66</td><td>0,82 mi</td><td><span class="ubar"><i style="width:66%"></i></span><em>66%</em></td></tr><tr><td>RH</td><td>44</td><td>0,55 mi</td><td><span class="ubar"><i style="width:55%"></i></span><em>55%</em></td></tr><tr><td>Produtos</td><td>34</td><td>0,42 mi</td><td><span class="ubar"><i style="width:42%"></i></span><em>42%</em></td></tr><tr><td>Sinistros</td><td>18</td><td>0,23 mi</td><td><span class="ubar"><i style="width:23%"></i></span><em>23%</em></td></tr></tbody></table></div>
+    <div class="card"><div class="ch"><h5>Por tipo de material</h5></div>
+      <div class="stk"><i style="width:52%"></i><i style="width:31%"></i><i style="width:17%"></i></div>
+      <div class="lg"><span><em class="c1"></em>Apresentações<b>52%</b></span><span><em class="c2"></em>Artes<b>31%</b></span><span><em class="c3"></em>Textos<b>17%</b></span></div></div>
+  </div>
+</main></div></div></div>
+  <p class="demo on-dark">Tela conceitual com dados de demonstração.</p>
+</section>
+
+<!-- 10 Investimento -->
+<section class="slide dark" id="investimento" aria-label="Investimento">
+  <div class="top"><span class="tag">Investimento</span><i></i><svg class="logo" role="img" aria-label="KEV" viewBox="0 0 1061.51 226.26"><use href="#kev"/></svg><span class="pg">08</span></div>
+  <div class="body">
+    <div class="invest">
+      <div class="total"><b>R$ 1.800</b><span>Valor total para desenvolver e colocar o portal no ar. Desenvolvimento feito pelo próprio time.</span></div>
+      <table class="costs">
+        <tbody>
+          <tr><td>Domínio <small><a href="https://registro.br" target="_blank" rel="noopener">Registro.br</a>, 1 ano</small></td><td>R$ 50</td></tr>
+          <tr><td>Banco, login e armazenamento <small><a href="https://supabase.com/pricing" target="_blank" rel="noopener">Supabase Pro</a>, 1º mês</small></td><td>R$ 150</td></tr>
+          <tr><td>Hospedagem <small><a href="https://vercel.com/pricing" target="_blank" rel="noopener">Vercel Pro</a>, 1º mês</small></td><td>R$ 120</td></tr>
+          <tr><td>Créditos de IA para texto e roteamento <small><a href="https://www.anthropic.com/pricing" target="_blank" rel="noopener">Claude API</a></small></td><td>R$ 500</td></tr>
+          <tr><td>Imagens e vídeos com IA <small><a href="https://higgsfield.ai" target="_blank" rel="noopener">Higgsfield Ultra</a>, 1º mês (US$ 129)</small></td><td>R$ 700</td></tr>
+          <tr><td>Reserva técnica <small>Variação cambial e ajustes do piloto</small></td><td>R$ 280</td></tr>
+          <tr class="sum"><td>Total</td><td>R$ 1.800</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="rec">
+      <div class="rech"><span class="rk">Projeção de custo recorrente mensal · a partir do 2º mês</span><span class="rbase">Base fixa R$ 970: Supabase R$ 150 · Vercel R$ 120 · Higgsfield R$ 700</span></div>
+      <div class="scen">
+        <div class="sc2"><span class="sk">Piloto</span><b>R$ 1.170<em>/mês</em></b><p>1 BU · até 100 pedidos/mês<br>Claude API estimada: R$ 200</p></div>
+        <div class="sc2"><span class="sk">Expansão</span><b>R$ 1.570<em>/mês</em></b><p>3 BUs · até 300 pedidos/mês<br>Claude API estimada: R$ 600</p></div>
+        <div class="sc2"><span class="sk">Todas as BUs</span><b>R$ 2.470<em>/mês</em></b><p>Até 800 pedidos/mês<br>Claude API estimada: R$ 1.500</p></div>
+      </div>
+      <p class="small">Projeção indicativa. O custo efetivo depende do consumo de tokens e da adesão das BUs, com limites configuráveis por área. A estimativa será recalibrada após os primeiros meses de operação, com base nos dados reais do painel de consumo. Câmbio de referência de R$ 5,40; no plano anual, o Higgsfield cai para US$ 99/mês.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 9 Stack -->
+<section class="slide" id="stack" aria-label="Stack de desenvolvimento">
+  <div class="top"><span class="tag">Stack de desenvolvimento</span><i></i><svg class="logo" role="img" aria-label="KEV" viewBox="0 0 1061.51 226.26"><use href="#kev"/></svg><span class="pg">09</span></div>
+  <div class="body">
+    <h2>Ferramentas maduras, sem contrato longo</h2>
+    <div class="stack">
+      <div class="tech"><span class="layer">Endereço</span><h3><a href="https://registro.br" target="_blank" rel="noopener">Registro.br</a></h3><p>Domínio próprio do portal, ex.: studio.kevseguros.com.br ou domínio dedicado.</p></div>
+      <div class="tech"><span class="layer">Interface</span><h3><a href="https://nextjs.org" target="_blank" rel="noopener">Next.js</a></h3><p>Portal web responsivo, acessível pelo navegador no computador ou no celular.</p></div>
+      <div class="tech"><span class="layer">Hospedagem</span><h3><a href="https://vercel.com" target="_blank" rel="noopener">Vercel</a></h3><p>Publicação, HTTPS e escala automática do portal.</p></div>
+      <div class="tech"><span class="layer">Banco, login e arquivos</span><h3><a href="https://supabase.com" target="_blank" rel="noopener">Supabase</a></h3><p>Base de dados, login corporativo, armazenamento de templates e materiais gerados.</p></div>
+      <div class="tech"><span class="layer">Inteligência</span><h3><a href="https://www.anthropic.com/api" target="_blank" rel="noopener">Claude API</a></h3><p>Entende o pedido, direciona para a área certa e gera textos e estrutura de slides.</p></div>
+      <div class="tech"><span class="layer">Imagens e vídeos</span><h3><a href="https://higgsfield.ai" target="_blank" rel="noopener">Higgsfield</a></h3><p>Plano Ultra: 3.000 créditos/mês para imagens (Nano Banana Pro) e vídeos curtos (Seedance) das artes.</p></div>
+      <div class="tech"><span class="layer">Arquivos de saída</span><h3><a href="https://gitbrent.github.io/PptxGenJS/" target="_blank" rel="noopener">PptxGenJS</a></h3><p>Monta o PowerPoint final com a identidade oficial. Gratuito e de código aberto.</p></div>
+      <div class="tech"><span class="layer">Identidade</span><h3>Templates KEV</h3><p>Logo, paleta, tipografia e tom de voz oficiais aplicados automaticamente.</p></div>
+      <div class="tech own"><span class="layer">Controle</span><h3>Sistema próprio KEV</h3><p>Integração via API: tokens por usuário e área, número de solicitações e limites.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 11 Cronograma -->
+<section class="slide" id="cronograma" aria-label="Cronograma">
+  <div class="top"><span class="tag">Cronograma</span><i></i><svg class="logo" role="img" aria-label="KEV" viewBox="0 0 1061.51 226.26"><use href="#kev"/></svg><span class="pg">10</span></div>
+  <div class="body">
+    <h2>Cronograma do projeto</h2>
+    <div class="gantt">
+      <div class="gl gh"><em></em><span class="wk">Semana 1</span></div><div class="gdays"><span class="d0h">Dia 0</span><span class="">Dia 1</span><span class="">Dia 2</span><span class="">Dia 3</span><span class="">Dia 4</span><span class="">Dia 5</span><span class="w2" style="grid-column:7 / 9">Semana 2</span></div>
+      <div class="gl"><em>Início</em>Liberação do orçamento</div><div class="gtrack"><span class="gbar out" style="grid-column:1 / 2"></span></div>
+<div class="gl"><em>Fundação</em>Contratação, domínio e banco</div><div class="gtrack"><span class="gbar " style="grid-column:2 / 3"></span></div>
+<div class="gl"><em></em>Login corporativo e templates KEV</div><div class="gtrack"><span class="gbar " style="grid-column:2 / 4"></span></div>
+<div class="gl"><em>Pedido</em>Tela de solicitação</div><div class="gtrack"><span class="gbar " style="grid-column:3 / 4"></span></div>
+<div class="gl"><em></em>IA que classifica e direciona</div><div class="gtrack"><span class="gbar " style="grid-column:3 / 5"></span></div>
+<div class="gl"><em>Geradores</em>Apresentações, artes e textos</div><div class="gtrack"><span class="gbar " style="grid-column:4 / 6"></span></div>
+<div class="gl"><em>Controle</em>Integração com o sistema próprio</div><div class="gtrack"><span class="gbar ink" style="grid-column:5 / 6"></span></div>
+<div class="gl"><em></em>Tokens, cotas e painel</div><div class="gtrack"><span class="gbar ink" style="grid-column:5 / 7"></span></div>
+<div class="gl"><em>Testes</em>Testes com BU piloto e ajustes</div><div class="gtrack"><span class="gbar " style="grid-column:7 / 9"></span></div>
+<div class="gl"><em>Go-live</em>Portal aberto para as áreas</div><div class="gtrack"><span class="gms" style="grid-column:7 / 9"><i></i>No ar</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 12 Impacto -->
+<section class="slide lime" id="impacto" aria-label="Resultados esperados">
+  <div class="top"><span class="tag">Resultados esperados</span><i></i><svg class="logo" role="img" aria-label="KEV" viewBox="0 0 1061.51 226.26"><use href="#kev"/></svg><span class="pg">11</span></div>
+  <div class="body">
+    <h2>Resultados esperados</h2>
+    <div class="res">
+      <div class="r"><span class="rk">Prazo</span><b>Minutos</b><p>para entregar demandas simples. Hoje, 2,5 dias.</p></div>
+      <div class="r"><span class="rk">Tempo do time</span><b>112h/mês</b><p>de capacidade sênior devolvida, com metade dos pedidos resolvida no portal.</p></div>
+      <div class="r"><span class="rk">Marca</span><b>100%</b><p>dos materiais do portal nos templates oficiais da KEV.</p></div>
+      <div class="r"><span class="rk">Controle</span><b>Por área</b><p>consumo de tokens e volume de pedidos no sistema próprio.</p></div>
+    </div>
+    <div class="dest"><span class="rk">O tempo devolvido vai para</span><div class="unlock"><span>Planejamento</span><span>Insights</span><span>Branding</span><span>Canais</span><span>Projetos estratégicos</span></div></div>
+    <p class="small" style="color:var(--ink);opacity:.7">Metas medidas a partir do go-live e revisadas na avaliação de 30 dias.</p>
+  </div>
+</section>
+
+<!-- 13 Pedido -->
+<section class="slide dark ask" id="pedido" aria-label="Próximos passos">
+  <div class="top"><span class="tag">O que precisamos</span><i></i><svg class="logo" role="img" aria-label="KEV" viewBox="0 0 1061.51 226.26"><use href="#kev"/></svg><span class="pg">12</span></div>
+  <div class="body">
+    <h2>Aprovação de <span class="br">R$ 1.800</span> e uma BU piloto</h2>
+    <ol>
+      <li>Liberar o orçamento de R$ 1.800 para contratação das ferramentas</li>
+      <li>Indicar uma BU piloto para os testes da semana 2</li>
+      <li>Validar com TI a integração com o sistema próprio e o login corporativo</li>
+      <li>Revisar resultados em 30 dias: pedidos atendidos, horas devolvidas e consumo por área</li>
+    </ol>
+  </div>
+</section>
+
+<!-- Iniciativa -->
+<section class="slide dark endnote" id="iniciativa" aria-label="Uma iniciativa Marketing KEV">
+  <div class="body">
+    <p class="en-k">Uma iniciativa</p>
+    <h1>Marketing <span>KEV</span></h1>
+  </div>
+</section>
+
+<!-- Encerramento -->
+<section class="slide lime endlogo" id="fim" aria-label="KEV">
+  <div class="body">
+    <svg class="logo big" role="img" aria-label="KEV" viewBox="0 0 1061.51 226.26"><use href="#kev"/></svg>
+  </div>
+</section>
+
+</main>
+
+<nav class="nav" aria-label="Navegação dos slides">
+  <button type="button" id="prev" aria-label="Slide anterior">◀</button>
+  <span class="ct" id="ct">01 / 14</span>
+  <button type="button" id="next" aria-label="Próximo slide">▶</button>
+  <button type="button" id="fs" aria-label="Tela cheia">⛶</button>
+</nav>
+
+<script>
+(function(){
+  document.documentElement.classList.add('js');
+  var deck = document.getElementById('deck');
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var ct = document.getElementById('ct');
+  var cur = 0;
+  function pad(n){ return (n < 10 ? '0' : '') + n; }
+  function fit(){
+    var s = Math.min(window.innerWidth / 1280, window.innerHeight / 720);
+    deck.style.setProperty('--s', s);
+  }
+
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var SEL = ['.lockup .logo', '.sign span', '.endlogo .logo', '.en-k', '.endnote h1', '.cover .meta', '.body > h1', '.body > h2', '.body > .lead', '.body > .prompt', '.body > .d0',
+     '.team .person', '.num', '.col > h2', '.col > h3', '.list li', '.step', '.gain', '.feats li', '.panel',
+    '.tech', '.total', '.costs tr', '.day', '.sc', '.col > .small', '.col > .lead', '.unlock span', '.ask li', '.res .r', '.dest .rk', '.gantt .gl', '.gms', '.gdays', '.body > .small', '.shot', '.demo', '.vcol', '.sc2', '.rech'].join(',');
+  var BARS = '.person .bar i, .prow .bar i, .sc .track i, .app .ubar i, .stk i, .gbar';
+  function countUp(el, delay){
+    if (!el.dataset.t) el.dataset.t = el.textContent;
+    var t = el.dataset.t, m = t.match(/\d[\d.,]*/);
+    if (!m) return;
+    var raw = m[0], dec = raw.indexOf(',') > -1 ? raw.split(',')[1].length : 0;
+    var val = parseFloat(raw.replace(/\./g, '').replace(',', '.'));
+    var fmt = function(v){ return v.toLocaleString('pt-BR', { minimumFractionDigits: dec, maximumFractionDigits: dec }); };
+    el.textContent = t.replace(raw, fmt(0));
+    setTimeout(function(){
+      var t0 = null;
+      function step(ts){
+        if (t0 === null) t0 = ts;
+        var p = Math.min(1, (ts - t0) / 1100), e = 1 - Math.pow(1 - p, 3);
+        el.textContent = t.replace(raw, fmt(val * e));
+        if (p < 1) requestAnimationFrame(step); else el.textContent = t;
+      }
+      requestAnimationFrame(step);
+    }, delay);
+  }
+  function stagger(items, base){
+    items.forEach(function(n, i){
+      var d = Math.min(base + i * 75, base + 1500);
+      n.classList.remove('go'); n.classList.add(n.matches('.unlock span, .sign span') ? 'pop' : 'rv');
+      if (n.classList.contains('pop')) n.classList.add('rv');
+      n.style.setProperty('--d', d + 'ms');
+      void n.offsetWidth; n.classList.add('go');
+      n.querySelectorAll('.num b, .g b, .total b, .r b').forEach(function(b){ countUp(b, d + 150); });
+    });
+  }
+  function beats(slide){
+    slide.querySelectorAll('.beat').forEach(function(bt, i){
+      var d = 350 + i * 700;
+      bt.classList.remove('go'); bt.style.setProperty('--d', d + 'ms'); void bt.offsetWidth; bt.classList.add('go');
+      Array.prototype.forEach.call(bt.children, function(c, k){
+        c.classList.remove('go'); c.classList.add('rv'); c.style.setProperty('--d', (d + 350 + k * 90) + 'ms'); void c.offsetWidth; c.classList.add('go');
+      });
+    });
+  }
+  var typers = [];
+  function typewrite(slide){
+    typers.forEach(clearTimeout); typers = [];
+    slide.querySelectorAll('[data-type]').forEach(function(el){
+      var txt = el.getAttribute('data-type'), i = 0;
+      el.textContent = '';
+      function tick(){ el.textContent = txt.slice(0, ++i); if (i < txt.length) typers.push(setTimeout(tick, 22)); }
+      typers.push(setTimeout(tick, 1300));
+    });
+  }
+  function animate(slide){
+    if (reduce) return;
+    beats(slide);
+    typewrite(slide);
+    var items = Array.prototype.filter.call(slide.querySelectorAll(SEL), function(n){ return !n.closest('.frag'); });
+    items.forEach(function(n, i){
+      var d = Math.min(120 + i * 75, 1600);
+      n.classList.remove('go'); n.classList.add(n.matches('.unlock span, .sign span') ? 'pop' : 'rv');
+      if (n.classList.contains('pop')) n.classList.add('rv');
+      n.style.setProperty('--d', d + 'ms');
+      void n.offsetWidth; n.classList.add('go');
+      n.querySelectorAll('.num b, .g b, .total b, .r b').forEach(function(b){ countUp(b, d + 150); });
+      if (n.matches('.num b, .g b, .total b')) countUp(n, d + 150);
+    });
+    slide.querySelectorAll(BARS).forEach(function(b, i){
+      if (b.closest('.frag')) return;
+      b.classList.remove('go'); b.classList.add('grow');
+      b.style.setProperty('--d', (500 + i * 90) + 'ms');
+      void b.offsetWidth; b.classList.add('go');
+    });
+  }
+  var step = 0;
+  function frags(){ return slides[cur].querySelectorAll('.frag'); }
+  function next(){
+    var fr = frags();
+    if (step < fr.length) {
+      var el = fr[step++]; el.classList.add('shown');
+      if (!reduce) stagger(Array.prototype.slice.call(el.querySelectorAll('h3, .g')), 150);
+      return;
+    }
+    show(cur + 1);
+  }
+  function show(i){
+    cur = Math.max(0, Math.min(slides.length - 1, i));
+    step = 0;
+    slides[cur].querySelectorAll('.frag').forEach(function(el){ el.classList.remove('shown'); });
+    slides.forEach(function(el, k){ el.classList.toggle('on', k === cur); el.setAttribute('aria-hidden', k === cur ? 'false' : 'true'); });
+    ct.textContent = pad(cur + 1) + ' / ' + pad(slides.length);
+    animate(slides[cur]);
+  }
+  document.getElementById('prev').addEventListener('click', function(){ show(cur - 1); });
+  document.getElementById('next').addEventListener('click', next);
+  deck.addEventListener('click', function(e){ if (e.target.closest('a, button')) return; next(); });
+  document.getElementById('fs').addEventListener('click', function(){
+    try {
+      if (document.fullscreenElement) { document.exitFullscreen(); }
+      else if (document.documentElement.requestFullscreen) { document.documentElement.requestFullscreen().catch(function(){}); }
+    } catch (e) {}
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); next(); }
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'PageUp') { e.preventDefault(); show(cur - 1); }
+    if (e.key === 'Home') show(0);
+    if (e.key === 'End') show(slides.length - 1);
+  });
+  var x0 = null;
+  deck.addEventListener('touchstart', function(e){ x0 = e.touches[0].clientX; }, { passive: true });
+  deck.addEventListener('touchend', function(e){
+    if (x0 === null) return;
+    var dx = e.changedTouches[0].clientX - x0;
+    if (Math.abs(dx) > 40) { if (dx < 0) next(); else show(cur - 1); }
+    x0 = null;
+  });
+  window.addEventListener('resize', fit);
+  fit(); show(0);
+})();
+</script>
+
+</body>
+</html>
